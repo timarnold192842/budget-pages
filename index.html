@@ -141,25 +141,35 @@
         }
         .date-field-row {
             display: flex;
+            flex-wrap: wrap;
             gap: 4px;
             align-items: center;
         }
         .date-field-row input {
-            flex: 1;
+            flex: 1 1 100%;
             min-width: 0;
         }
-        .btn-today {
-            padding: 4px 8px;
-            font-size: 0.75em;
+        .date-nudge-group {
+            display: flex;
+            gap: 3px;
+            width: 100%;
+        }
+        .btn-today, .btn-nudge {
+            flex: 1 1 0;
+            padding: 4px 2px;
+            font-size: 0.72em;
             border: 1px solid #ced4da;
             border-radius: 4px;
             background: #f8f9fa;
             cursor: pointer;
             white-space: nowrap;
-            flex-shrink: 0;
+            text-align: center;
         }
-        .btn-today:hover {
+        .btn-today:hover, .btn-nudge:hover {
             background: #e9ecef;
+        }
+        .btn-today {
+            font-weight: 600;
         }
 
         .btn-add {
@@ -572,12 +582,12 @@
         body.dark-mode .details-content select {
             background-color: #141c2e;
         }
-        body.dark-mode .btn-today {
+        body.dark-mode .btn-today, body.dark-mode .btn-nudge {
             background: #1e293b;
             border-color: #374151;
             color: #d1d5db;
         }
-        body.dark-mode .btn-today:hover {
+        body.dark-mode .btn-today:hover, body.dark-mode .btn-nudge:hover {
             background: #374151;
         }
         body.dark-mode .price-targets {
@@ -2537,7 +2547,7 @@ function createField(item, key, type = 'text', options = []) {
         return `<div><label for="${item.id}_${key}">${key.replace(/_/g, ' ')}</label><select id="${item.id}_${key}" data-id="${item.id}" data-key="${key}">${h}</select></div>`; 
     } 
     if (type === 'date') {
-        return `<div><label for="${item.id}_${key}">${key.replace(/_/g, ' ')}</label><div class="date-field-row"><input type="${type}" id="${item.id}_${key}" data-id="${item.id}" data-key="${key}" value="${escapeHtml(v)}"><button type="button" class="btn-today" onclick="setDateToToday('${item.id}', '${key}')" title="Set to today">Today</button></div></div>`;
+        return `<div><label for="${item.id}_${key}">${key.replace(/_/g, ' ')}</label><div class="date-field-row"><input type="${type}" id="${item.id}_${key}" data-id="${item.id}" data-key="${key}" value="${escapeHtml(v)}"><div class="date-nudge-group"><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'month', -1)" title="Minus 1 month">\u22121mo</button><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'week', -1)" title="Minus 1 week">\u22121wk</button><button type="button" class="btn-today" onclick="setDateToToday('${item.id}', '${key}')" title="Set to today">Today</button><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'week', 1)" title="Plus 1 week">+1wk</button><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'month', 1)" title="Plus 1 month">+1mo</button></div></div></div>`;
     }
     return `<div><label for="${item.id}_${key}">${key.replace(/_/g, ' ')}</label><input type="${type}" id="${item.id}_${key}" data-id="${item.id}" data-key="${key}" value="${escapeHtml(v)}"></div>`; 
 }
@@ -2545,6 +2555,28 @@ function setDateToToday(itemId, key) {
     const input = document.getElementById(`${itemId}_${key}`);
     if (!input) return;
     input.value = toYMD(new Date());
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+function nudgeDate(itemId, key, unit, amount) {
+    const input = document.getElementById(`${itemId}_${key}`);
+    if (!input) return;
+    // Parse existing YYYY-MM-DD value; fall back to today if empty/invalid
+    let base = new Date();
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((input.value || '').trim());
+    if (m) {
+        base = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    }
+    if (unit === 'week') {
+        base.setDate(base.getDate() + amount * 7);
+    } else if (unit === 'month') {
+        const targetDay = base.getDate();
+        base.setDate(1);
+        base.setMonth(base.getMonth() + amount);
+        // Clamp to last valid day of the resulting month (e.g. Jan 31 -> Feb 28)
+        const lastDay = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+        base.setDate(Math.min(targetDay, lastDay));
+    }
+    input.value = toYMD(base);
     input.dispatchEvent(new Event('change', { bubbles: true }));
 }
 function createCheckboxField(item, key, label) { const v = item[key]; return `<div><label for="${item.id}_${key}"><input type="checkbox" id="${item.id}_${key}" data-id="${item.id}" data-key="${key}" ${v ? 'checked' : ''}> ${label}</label></div>`; }
