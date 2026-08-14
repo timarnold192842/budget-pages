@@ -710,6 +710,45 @@
         body.dark-mode .data-management-note {
             color: #9ca3af;
         }
+        .scenario-manager {
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: #ffffff;
+        }
+        .scenario-manager-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 8px;
+        }
+        .scenario-manager input,
+        .scenario-manager select {
+            font-size: 0.9em;
+            padding: 4px 8px;
+        }
+        .scenario-manager input {
+            min-width: 180px;
+            flex: 1 1 180px;
+        }
+        .scenario-manager select {
+            min-width: 240px;
+            flex: 2 1 240px;
+        }
+        .scenario-status {
+            margin-top: 8px;
+            font-size: 0.8em;
+            color: #6b7280;
+        }
+        body.dark-mode .scenario-manager {
+            background: #111827;
+            border-color: #374151;
+        }
+        body.dark-mode .scenario-status {
+            color: #9ca3af;
+        }
         .data-management-inner {
             padding: 10px;
             border: 1px solid #ddd;
@@ -1568,6 +1607,19 @@
                             <input type="file" id="importFile" accept=".json" style="margin-left: 10px; font-size: 0.9em;" onchange="handleFileImport(this)">
                             <button onclick="document.getElementById('importFile').click()" style="margin-left: 5px; font-size: 0.9em;">Choose JSON File</button>
                         </div>
+
+                        <div class="scenario-manager">
+                            <strong>Scenarios:</strong>
+                            <div class="scenario-manager-row">
+                                <input type="text" id="scenario-name-input" placeholder="Scenario name">
+                                <button type="button" id="scenario-save-btn" onclick="saveCurrentScenario()" style="font-size: 0.9em;">Save Scenario</button>
+                                <button type="button" id="scenario-delete-btn" onclick="deleteSelectedScenario()" style="font-size: 0.9em; color: red;">Delete</button>
+                            </div>
+                            <div class="scenario-manager-row">
+                                <select id="scenario-select" onchange="loadScenarioById(this.value)"></select>
+                            </div>
+                            <div id="scenario-status" class="scenario-status">No saved scenario selected. The current working state is live.</div>
+                        </div>
                         
                         <div>
                             <strong>Storage:</strong>
@@ -2106,6 +2158,11 @@ let state = {
     loanGroups: [],
     transactionGroups: []
 };
+const SCENARIO_STORAGE_KEY = 'financialForecastScenarios';
+let scenarioManager = {
+    activeScenarioId: null,
+    scenarios: []
+};
 let chartInstance = null;
 let datasetColorMap = new Map(); // Persistent color mapping for datasets
 
@@ -2192,6 +2249,15 @@ function applyImportedData(importData) {
         state.transactionPlotOptions = cloneData(importData.transactionPlotOptions);
     }
 
+    if (importData.viewRange && importData.viewRange.start && importData.viewRange.end) {
+        const importedStart = new Date(importData.viewRange.start);
+        const importedEnd = new Date(importData.viewRange.end);
+        if (!Number.isNaN(importedStart.getTime()) && !Number.isNaN(importedEnd.getTime())) {
+            currentViewStart = importedStart;
+            currentViewEnd = importedEnd;
+        }
+    }
+
     state.yAxisFrozen = importData.yAxisFrozen || null;
 
     // Ensure required collections exist even if not provided
@@ -2263,6 +2329,213 @@ function applyImportedData(importData) {
         applied: true,
         openSections: importData.openSections || null
     };
+}
+
+function captureOpenSections() {
+    const openSections = {};
+    document.querySelectorAll('details.section-collapsible').forEach(details => {
+        if (details.id) {
+            openSections[details.id] = details.open;
+        }
+    });
+    return openSections;
+}
+
+function buildSerializableState() {
+    return {
+        accounts: cloneData(state.accounts),
+        loans: cloneData(state.loans),
+        transactions: cloneData(state.transactions),
+        units: cloneData(state.units),
+        accountGroups: cloneData(state.accountGroups),
+        loanGroups: cloneData(state.loanGroups),
+        transactionGroups: cloneData(state.transactionGroups),
+        plotOptions: cloneData(state.plotOptions),
+        transactionPlotOptions: cloneData(state.transactionPlotOptions),
+        yAxisFrozen: state.yAxisFrozen || null,
+        viewRange: {
+            start: currentViewStart.toISOString(),
+            end: currentViewEnd.toISOString()
+        },
+        openSections: captureOpenSections(),
+        timestamp: new Date().toISOString()
+    };
+}
+
+function normalizeScenarioRegistry(rawRegistry) {
+    const registry = {
+        activeScenarioId: null,
+        scenarios: []
+    };
+
+    if (!rawRegistry || typeof rawRegistry !== 'object') {
+        return registry;
+    }
+
+    const rawScenarios = Array.isArray(rawRegistry.scenarios) ? rawRegistry.scenarios : [];
+    registry.scenarios = rawScenarios
+        .filter(scenario => scenario && typeof scenario === 'object' && scenario.snapshot && typeof scenario.snapshot === 'object')
+        .map(scenario => ({
+            id: typeof scenario.id === 'string' && scenario.id ? scenario.id : genId('scenario'),
+            name: typeof scenario.name === 'string' && scenario.name.trim() ? scenario.name.trim() : 'Untitled Scenario',
+            createdAt: typeof scenario.createdAt === 'string' ? scenario.createdAt : (typeof scenario.updatedAt === 'string' ? scenario.updatedAt : new Date().toISOString()),
+            updatedAt: typeof scenario.updatedAt === 'string' ? scenario.updatedAt : new Date().toISOString(),
+            snapshot: cloneData(scenario.snapshot)
+        }));
+
+    if (typeof rawRegistry.activeScenarioId === 'string' && registry.scenarios.some(scenario => scenario.id === rawRegistry.activeScenarioId)) {
+        registry.activeScenarioId = rawRegistry.activeScenarioId;
+    } else {
+        registry.activeScenarioId = registry.scenarios[0]?.id || null;
+    }
+
+    return registry;
+}
+
+function saveScenarioRegistry() {
+    try {
+        localStorage.setItem(SCENARIO_STORAGE_KEY, JSON.stringify(scenarioManager));
+    } catch (error) {
+        console.error('Failed to save scenario registry:', error);
+    }
+}
+
+function loadScenarioRegistry() {
+    try {
+        const stored = localStorage.getItem(SCENARIO_STORAGE_KEY);
+        if (!stored) {
+            scenarioManager = normalizeScenarioRegistry(null);
+            return false;
+        }
+        scenarioManager = normalizeScenarioRegistry(JSON.parse(stored));
+        return scenarioManager.scenarios.length > 0;
+    } catch (error) {
+        console.error('Failed to load scenario registry:', error);
+        scenarioManager = normalizeScenarioRegistry(null);
+        return false;
+    }
+}
+
+function getActiveScenarioRecord() {
+    if (!scenarioManager || !Array.isArray(scenarioManager.scenarios)) {
+        return null;
+    }
+    return scenarioManager.scenarios.find(scenario => scenario.id === scenarioManager.activeScenarioId) || null;
+}
+
+function applyScenarioSnapshot(snapshot) {
+    const { applied, openSections } = applyImportedData(snapshot);
+    if (!applied) {
+        return false;
+    }
+    restoreOpenSections(openSections);
+    renderAll();
+    recalculateAndDraw();
+    return true;
+}
+
+function saveCurrentScenario() {
+    const nameInput = document.getElementById('scenario-name-input');
+    const requestedName = nameInput?.value?.trim() || '';
+    const currentSnapshot = buildSerializableState();
+    const existing = getActiveScenarioRecord();
+    const nextName = requestedName || existing?.name || `Scenario ${scenarioManager.scenarios.length + 1}`;
+
+    let scenarioRecord = existing;
+    if (!scenarioRecord) {
+        scenarioRecord = scenarioManager.scenarios.find(scenario => scenario.name.toLowerCase() === nextName.toLowerCase()) || null;
+    }
+
+    if (!scenarioRecord) {
+        scenarioRecord = {
+            id: genId('scenario'),
+            name: nextName,
+            createdAt: currentSnapshot.timestamp,
+            updatedAt: currentSnapshot.timestamp,
+            snapshot: currentSnapshot
+        };
+        scenarioManager.scenarios.push(scenarioRecord);
+    } else {
+        scenarioRecord.name = nextName;
+        scenarioRecord.updatedAt = currentSnapshot.timestamp;
+        scenarioRecord.snapshot = currentSnapshot;
+    }
+
+    scenarioManager.activeScenarioId = scenarioRecord.id;
+    saveScenarioRegistry();
+    renderScenarioManager();
+    showToast(`Saved scenario "${scenarioRecord.name}"`, 'success');
+}
+
+function loadScenarioById(scenarioId) {
+    if (!scenarioId) {
+        scenarioManager.activeScenarioId = null;
+        saveScenarioRegistry();
+        renderScenarioManager();
+        return loadFromLocalStorage();
+    }
+    const scenarioRecord = scenarioManager.scenarios.find(scenario => scenario.id === scenarioId);
+    if (!scenarioRecord) {
+        return false;
+    }
+    scenarioManager.activeScenarioId = scenarioRecord.id;
+    saveScenarioRegistry();
+    renderScenarioManager();
+    return applyScenarioSnapshot(scenarioRecord.snapshot);
+}
+
+function deleteSelectedScenario() {
+    const scenarioRecord = getActiveScenarioRecord();
+    if (!scenarioRecord) {
+        showToast('No saved scenario is selected.', 'info');
+        return;
+    }
+    const confirmed = confirm(`Delete scenario "${scenarioRecord.name}"?`);
+    if (!confirmed) {
+        return;
+    }
+
+    scenarioManager.scenarios = scenarioManager.scenarios.filter(scenario => scenario.id !== scenarioRecord.id);
+    scenarioManager.activeScenarioId = scenarioManager.scenarios[0]?.id || null;
+    saveScenarioRegistry();
+    renderScenarioManager();
+
+    const replacement = getActiveScenarioRecord();
+    if (replacement) {
+        applyScenarioSnapshot(replacement.snapshot);
+    } else {
+        showToast('Scenario deleted. Save the current state to create a new one.', 'success');
+    }
+}
+
+function renderScenarioManager() {
+    const select = document.getElementById('scenario-select');
+    const nameInput = document.getElementById('scenario-name-input');
+    const status = document.getElementById('scenario-status');
+    const saveButton = document.getElementById('scenario-save-btn');
+    const deleteButton = document.getElementById('scenario-delete-btn');
+
+    if (!select || !nameInput || !status || !saveButton || !deleteButton) {
+        return;
+    }
+
+    const scenarios = Array.isArray(scenarioManager.scenarios)
+        ? [...scenarioManager.scenarios].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+        : [];
+    if (scenarios.length !== scenarioManager.scenarios.length) {
+        scenarioManager.scenarios = scenarios;
+        saveScenarioRegistry();
+    }
+
+    select.innerHTML = [`<option value="" ${scenarioManager.activeScenarioId ? '' : 'selected'}>Current working state</option>`, ...scenarios.map(scenario => `<option value="${escapeHtml(scenario.id)}" ${scenario.id === scenarioManager.activeScenarioId ? 'selected' : ''}>${escapeHtml(scenario.name)}</option>`)].join('');
+
+    const activeScenario = getActiveScenarioRecord();
+    nameInput.value = activeScenario ? activeScenario.name : '';
+    status.textContent = activeScenario
+        ? `Active scenario: ${activeScenario.name}`
+        : 'No saved scenario selected. The current working state is live.';
+    deleteButton.disabled = !activeScenario;
+    saveButton.textContent = activeScenario ? 'Update Scenario' : 'Save Scenario';
 }
 
 function restoreOpenSections(openSections) {
@@ -3259,7 +3532,7 @@ function renderTransactions() {
     
     document.getElementById('transactions-list').innerHTML = html;
 }
-function renderAll() { const uiState = getUIState(); renderUnits(); renderAccounts(); renderLoans(); renderTransactions(); applyUIState(uiState); }
+function renderAll() { const uiState = getUIState(); renderUnits(); renderAccounts(); renderLoans(); renderTransactions(); applyUIState(uiState); renderScenarioManager(); }
 
 // Debounced variant — coalesces rapid renderAll() calls (e.g. typing into a name field)
 let renderAllTimer = null;
@@ -4301,33 +4574,7 @@ let debounceTimer;
 // --- Local Storage Persistence ---
 function saveToLocalStorage() {
     try {
-        // Capture open/closed state of collapsible sections
-        const openSections = {};
-        document.querySelectorAll('details.section-collapsible').forEach(details => {
-            if (details.id) {
-                openSections[details.id] = details.open;
-            }
-        });
-        
-        const saveData = {
-            accounts: state.accounts,
-            loans: state.loans,
-            transactions: state.transactions,
-            units: state.units,
-            accountGroups: state.accountGroups,
-            loanGroups: state.loanGroups,
-            transactionGroups: state.transactionGroups,
-            plotOptions: state.plotOptions,
-            transactionPlotOptions: state.transactionPlotOptions,
-            yAxisFrozen: state.yAxisFrozen || null,
-            viewRange: {
-                start: currentViewStart.toISOString(),
-                end: currentViewEnd.toISOString()
-            },
-            openSections: openSections,
-            timestamp: new Date().toISOString()
-        };
-        
+        const saveData = buildSerializableState();
         localStorage.setItem('financialForecastData', JSON.stringify(saveData));
     } catch (error) {
         console.error('Failed to save to local storage:', error);
@@ -4342,6 +4589,8 @@ function loadFromLocalStorage() {
             const { applied, openSections } = applyImportedData(saveData);
             if (applied) {
                 restoreOpenSections(openSections);
+                renderAll();
+                recalculateAndDraw();
                 return true;
             }
         }
@@ -4354,6 +4603,9 @@ function loadFromLocalStorage() {
 function clearLocalStorage() {
     try {
         localStorage.removeItem('financialForecastData');
+        localStorage.removeItem(SCENARIO_STORAGE_KEY);
+        scenarioManager = normalizeScenarioRegistry(null);
+        renderScenarioManager();
     } catch (error) {
         console.error('Failed to clear local storage:', error);
     }
@@ -5435,20 +5687,7 @@ function exportToJSON(dataType = 'all') {
             break;
         case 'all':
         default:
-            exportData.accounts = state.accounts;
-            exportData.loans = state.loans;
-            exportData.transactions = state.transactions;
-            exportData.units = state.units;
-            exportData.accountGroups = state.accountGroups;
-            exportData.loanGroups = state.loanGroups;
-            exportData.transactionGroups = state.transactionGroups;
-            exportData.plotOptions = state.plotOptions;
-            exportData.transactionPlotOptions = state.transactionPlotOptions;
-            exportData.viewRange = {
-                start: currentViewStart.toISOString(),
-                end: currentViewEnd.toISOString()
-            };
-            exportData.openSections = openSections;
+            Object.assign(exportData, buildSerializableState(), { openSections });
             break;
     }
     
@@ -5496,7 +5735,6 @@ function importFromJSON(jsonString) {
         }
 
         restoreOpenSections(openSections);
-
         renderAll();
         recalculateAndDraw();
 
@@ -6402,10 +6640,25 @@ function makeResizable(sidebar, resizer) {
     window.addEventListener('resize', throttle(() => { if(chartInstance) chartInstance.resize(); }, 100));
 }
 async function initialize() {
-    // Try to load from local storage first
-    const loadedFromStorage = loadFromLocalStorage();
-    
+    // Try to load a saved scenario first, then fall back to the working snapshot.
+    const loadedScenarioRegistry = loadScenarioRegistry();
+    let loadedFromStorage = false;
+
+    if (loadedScenarioRegistry) {
+        const activeScenario = getActiveScenarioRecord();
+        if (activeScenario) {
+            const { applied, openSections } = applyImportedData(activeScenario.snapshot);
+            if (applied) {
+                restoreOpenSections(openSections);
+                loadedFromStorage = true;
+            }
+        }
+    }
+
     if (!loadedFromStorage) {
+        loadedFromStorage = loadFromLocalStorage();
+
+        if (!loadedFromStorage) {
         let defaultData = null;
 
         // Try embedded data first (works on file:// protocol)
@@ -6433,6 +6686,7 @@ async function initialize() {
         const { applied, openSections } = applyImportedData(defaultData);
         if (applied) {
             restoreOpenSections(openSections);
+        }
         }
     }
 
