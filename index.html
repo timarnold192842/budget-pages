@@ -2206,6 +2206,9 @@ let state = {
 };
 const SCENARIO_STORAGE_KEY = 'financialForecastScenarios';
 let applyToAll = false;
+// Blocks Apply-to-all sync while a scenario switch is settling through the debounce chain
+let _inScenarioSwitch = false;
+let _scenarioSwitchTimer = null;
 
 function setApplyToAll(value) {
     applyToAll = !!value;
@@ -2511,11 +2514,17 @@ function getActiveScenarioRecord() {
 }
 
 function applyScenarioSnapshot(snapshot) {
+    // Block Apply-to-all for the entire debounce chain (250ms recalc + 1000ms save = 1250ms)
+    _inScenarioSwitch = true;
+    clearTimeout(_scenarioSwitchTimer);
+    _scenarioSwitchTimer = setTimeout(() => { _inScenarioSwitch = false; }, 1500);
     // Preserve current graph bounds — switching scenarios should not move the zoom
     const savedStart = currentViewStart;
     const savedEnd = currentViewEnd;
     const { applied, openSections } = applyImportedData(snapshot);
     if (!applied) {
+        _inScenarioSwitch = false;
+        clearTimeout(_scenarioSwitchTimer);
         return false;
     }
     currentViewStart = savedStart;
@@ -4667,7 +4676,7 @@ function saveToLocalStorage() {
         if (active) {
             active.snapshot = saveData;
             active.updatedAt = saveData.timestamp;
-            if (applyToAll && scenarioManager.scenarios.length > 1) {
+            if (applyToAll && !_inScenarioSwitch && scenarioManager.scenarios.length > 1) {
                 syncSnapshotToAllScenarios(saveData);
             }
             saveScenarioRegistry();
