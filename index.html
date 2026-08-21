@@ -2536,6 +2536,13 @@ function switchToScenario(scenarioId) {
     if (scenarioId === scenarioManager.activeScenarioId) return;
     const record = scenarioManager.scenarios.find(s => s.id === scenarioId);
     if (!record) return;
+    // Flush the departing scenario synchronously before any timer can be cancelled
+    const departing = getActiveScenarioRecord();
+    if (departing) {
+        const snap = buildSerializableState();
+        departing.snapshot = snap;
+        departing.updatedAt = snap.timestamp;
+    }
     scenarioManager.activeScenarioId = scenarioId;
     saveScenarioRegistry();
     applyScenarioSnapshot(record.snapshot); // calls renderAll → renderScenarioBar
