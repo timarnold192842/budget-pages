@@ -710,45 +710,80 @@
         body.dark-mode .data-management-note {
             color: #9ca3af;
         }
-        .scenario-manager {
-            margin-bottom: 10px;
-            padding: 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            background: #ffffff;
-        }
-        .scenario-manager-row {
+        /* --- Scenario bar (top of sidebar) --- */
+        #scenario-bar {
             display: flex;
-            gap: 8px;
             flex-wrap: wrap;
+            gap: 5px;
+            padding: 8px 10px;
+            background: var(--sidebar-bg, #f8f9fa);
+            border-bottom: 1px solid var(--border-color, #dee2e6);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .scenario-pill {
+            display: inline-flex;
             align-items: center;
-            margin-top: 8px;
-        }
-        .scenario-manager input,
-        .scenario-manager select {
-            font-size: 0.9em;
-            padding: 4px 8px;
-        }
-        .scenario-manager input {
-            min-width: 180px;
-            flex: 1 1 180px;
-        }
-        .scenario-manager select {
-            min-width: 240px;
-            flex: 2 1 240px;
-        }
-        .scenario-status {
-            margin-top: 8px;
+            gap: 3px;
+            padding: 4px 11px;
+            border: 1px solid var(--border-color, #dee2e6);
+            border-radius: 14px;
+            background: transparent;
             font-size: 0.8em;
-            color: #6b7280;
+            cursor: pointer;
+            color: #495057;
+            transition: background 0.12s, border-color 0.12s;
+            white-space: nowrap;
+            line-height: 1.4;
         }
-        body.dark-mode .scenario-manager {
-            background: #111827;
-            border-color: #374151;
+        .scenario-pill:hover { background: rgba(0,0,0,0.05); }
+        .scenario-pill.active {
+            background: var(--primary-color, #007bff);
+            color: #fff;
+            border-color: var(--primary-color, #007bff);
+            font-weight: 600;
         }
-        body.dark-mode .scenario-status {
-            color: #9ca3af;
+        .scenario-pill-del {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            font-size: 0.72em;
+            line-height: 1;
+            background: rgba(0,0,0,0.12);
+            cursor: pointer;
+            margin-left: 1px;
+            border: none;
+            padding: 0;
+            color: inherit;
+            flex-shrink: 0;
         }
+        .scenario-pill.active .scenario-pill-del { background: rgba(255,255,255,0.25); }
+        .scenario-pill-del:hover { background: #dc3545 !important; color: #fff !important; }
+        .scenario-pill-add {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border: 1px dashed var(--border-color, #dee2e6);
+            border-radius: 50%;
+            background: transparent;
+            font-size: 1em;
+            cursor: pointer;
+            color: #6c757d;
+            padding: 0;
+            transition: all 0.12s;
+            flex-shrink: 0;
+        }
+        .scenario-pill-add:hover { border-color: var(--primary-color, #007bff); color: var(--primary-color, #007bff); }
+        body.dark-mode #scenario-bar { background: #1a2233; border-bottom-color: #2a3347; }
+        body.dark-mode .scenario-pill { color: #9ca3af; border-color: #2a3347; }
+        body.dark-mode .scenario-pill:hover { background: rgba(255,255,255,0.06); }
+        body.dark-mode .scenario-pill-add { border-color: #2a3347; color: #9ca3af; }
         .data-management-inner {
             padding: 10px;
             border: 1px solid #ddd;
@@ -1546,6 +1581,7 @@
     <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
     <div class="container">
         <div class="sidebar" id="sidebar">
+            <div id="scenario-bar" role="tablist" aria-label="Scenarios"></div>
             
             <details id="units-section" class="section-collapsible" open>
                 <summary class="section-header">
@@ -1608,19 +1644,6 @@
                             <button onclick="document.getElementById('importFile').click()" style="margin-left: 5px; font-size: 0.9em;">Choose JSON File</button>
                         </div>
 
-                        <div class="scenario-manager">
-                            <strong>Scenarios:</strong>
-                            <div class="scenario-manager-row">
-                                <input type="text" id="scenario-name-input" placeholder="Scenario name">
-                                <button type="button" id="scenario-save-btn" onclick="saveCurrentScenario()" style="font-size: 0.9em;">Save Scenario</button>
-                                <button type="button" id="scenario-delete-btn" onclick="deleteSelectedScenario()" style="font-size: 0.9em; color: red;">Delete</button>
-                            </div>
-                            <div class="scenario-manager-row">
-                                <select id="scenario-select" onchange="loadScenarioById(this.value)"></select>
-                            </div>
-                            <div id="scenario-status" class="scenario-status">No saved scenario selected. The current working state is live.</div>
-                        </div>
-                        
                         <div>
                             <strong>Storage:</strong>
                             <button onclick="loadFromLocalStorage()" style="margin-left: 10px; font-size: 0.9em;">Reload Saved</button>
@@ -2434,108 +2457,95 @@ function applyScenarioSnapshot(snapshot) {
     return true;
 }
 
-function saveCurrentScenario() {
-    const nameInput = document.getElementById('scenario-name-input');
-    const requestedName = nameInput?.value?.trim() || '';
-    const currentSnapshot = buildSerializableState();
-    const existing = getActiveScenarioRecord();
-    const nextName = requestedName || existing?.name || `Scenario ${scenarioManager.scenarios.length + 1}`;
-
-    let scenarioRecord = existing;
-    if (!scenarioRecord) {
-        scenarioRecord = scenarioManager.scenarios.find(scenario => scenario.name.toLowerCase() === nextName.toLowerCase()) || null;
-    }
-
-    if (!scenarioRecord) {
-        scenarioRecord = {
-            id: genId('scenario'),
-            name: nextName,
-            createdAt: currentSnapshot.timestamp,
-            updatedAt: currentSnapshot.timestamp,
-            snapshot: currentSnapshot
-        };
-        scenarioManager.scenarios.push(scenarioRecord);
-    } else {
-        scenarioRecord.name = nextName;
-        scenarioRecord.updatedAt = currentSnapshot.timestamp;
-        scenarioRecord.snapshot = currentSnapshot;
-    }
-
-    scenarioManager.activeScenarioId = scenarioRecord.id;
-    saveScenarioRegistry();
-    renderScenarioManager();
-    showToast(`Saved scenario "${scenarioRecord.name}"`, 'success');
-}
-
-function loadScenarioById(scenarioId) {
-    if (!scenarioId) {
-        scenarioManager.activeScenarioId = null;
+// Ensure at least one scenario exists (creates "Default" from current state if needed)
+function ensureDefaultScenario() {
+    if (!Array.isArray(scenarioManager.scenarios) || scenarioManager.scenarios.length === 0) {
+        const snap = buildSerializableState();
+        const def = { id: genId('scenario'), name: 'Default', createdAt: snap.timestamp, updatedAt: snap.timestamp, snapshot: snap };
+        scenarioManager.scenarios = [def];
+        scenarioManager.activeScenarioId = def.id;
         saveScenarioRegistry();
-        renderScenarioManager();
-        return loadFromLocalStorage();
-    }
-    const scenarioRecord = scenarioManager.scenarios.find(scenario => scenario.id === scenarioId);
-    if (!scenarioRecord) {
-        return false;
-    }
-    scenarioManager.activeScenarioId = scenarioRecord.id;
-    saveScenarioRegistry();
-    renderScenarioManager();
-    return applyScenarioSnapshot(scenarioRecord.snapshot);
-}
-
-function deleteSelectedScenario() {
-    const scenarioRecord = getActiveScenarioRecord();
-    if (!scenarioRecord) {
-        showToast('No saved scenario is selected.', 'info');
-        return;
-    }
-    const confirmed = confirm(`Delete scenario "${scenarioRecord.name}"?`);
-    if (!confirmed) {
-        return;
-    }
-
-    scenarioManager.scenarios = scenarioManager.scenarios.filter(scenario => scenario.id !== scenarioRecord.id);
-    scenarioManager.activeScenarioId = scenarioManager.scenarios[0]?.id || null;
-    saveScenarioRegistry();
-    renderScenarioManager();
-
-    const replacement = getActiveScenarioRecord();
-    if (replacement) {
-        applyScenarioSnapshot(replacement.snapshot);
-    } else {
-        showToast('Scenario deleted. Save the current state to create a new one.', 'success');
-    }
-}
-
-function renderScenarioManager() {
-    const select = document.getElementById('scenario-select');
-    const nameInput = document.getElementById('scenario-name-input');
-    const status = document.getElementById('scenario-status');
-    const saveButton = document.getElementById('scenario-save-btn');
-    const deleteButton = document.getElementById('scenario-delete-btn');
-
-    if (!select || !nameInput || !status || !saveButton || !deleteButton) {
-        return;
-    }
-
-    const scenarios = Array.isArray(scenarioManager.scenarios)
-        ? [...scenarioManager.scenarios].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-        : [];
-    if (scenarios.length !== scenarioManager.scenarios.length) {
-        scenarioManager.scenarios = scenarios;
+    } else if (!scenarioManager.activeScenarioId || !scenarioManager.scenarios.some(s => s.id === scenarioManager.activeScenarioId)) {
+        scenarioManager.activeScenarioId = scenarioManager.scenarios[0].id;
         saveScenarioRegistry();
     }
+}
 
-    select.innerHTML = [`<option value="" ${scenarioManager.activeScenarioId ? '' : 'selected'}>Current working state</option>`, ...scenarios.map(scenario => `<option value="${escapeHtml(scenario.id)}" ${scenario.id === scenarioManager.activeScenarioId ? 'selected' : ''}>${escapeHtml(scenario.name)}</option>`)].join('');
+// Switch to a scenario by id — loads its snapshot into working state
+function switchToScenario(scenarioId) {
+    if (scenarioId === scenarioManager.activeScenarioId) return;
+    const record = scenarioManager.scenarios.find(s => s.id === scenarioId);
+    if (!record) return;
+    scenarioManager.activeScenarioId = scenarioId;
+    saveScenarioRegistry();
+    applyScenarioSnapshot(record.snapshot); // calls renderAll → renderScenarioBar
+}
 
-    const activeScenario = getActiveScenarioRecord();
-    nameInput.value = activeScenario ? activeScenario.name : '';
-    status.textContent = activeScenario
-        ? `Active scenario: ${activeScenario.name}`
-        : 'No saved scenario selected. The current working state is live.';
-    deleteButton.disabled = !activeScenario;
-    saveButton.textContent = activeScenario ? 'Update Scenario' : 'Save Scenario';
+// Add a new scenario as a copy of the current working state, then switch to it
+function addScenario() {
+    const base = 'Scenario';
+    const existing = new Set(scenarioManager.scenarios.map(s => s.name));
+    let n = scenarioManager.scenarios.length + 1;
+    let suggested = `${base} ${n}`;
+    while (existing.has(suggested)) { n++; suggested = `${base} ${n}`; }
+    const typed = prompt('Name for new scenario:', suggested);
+    if (typed === null) return; // cancelled
+    const name = typed.trim() || suggested;
+    const snap = buildSerializableState();
+    const newRec = { id: genId('scenario'), name, createdAt: snap.timestamp, updatedAt: snap.timestamp, snapshot: snap };
+    scenarioManager.scenarios.push(newRec);
+    scenarioManager.activeScenarioId = newRec.id;
+    saveScenarioRegistry();
+    renderScenarioBar();
+    showToast(`Created scenario "${name}"`, 'success');
+}
+
+// Rename a scenario (double-click on pill)
+function renameScenario(scenarioId) {
+    const record = scenarioManager.scenarios.find(s => s.id === scenarioId);
+    if (!record) return;
+    const newName = prompt('Rename scenario:', record.name);
+    if (newName === null) return;
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === record.name) return;
+    record.name = trimmed;
+    record.updatedAt = new Date().toISOString();
+    saveScenarioRegistry();
+    renderScenarioBar();
+}
+
+// Delete a scenario (must keep at least one)
+function deleteScenario(scenarioId) {
+    if (scenarioManager.scenarios.length <= 1) { showToast('You must keep at least one scenario.', 'info'); return; }
+    const record = scenarioManager.scenarios.find(s => s.id === scenarioId);
+    if (!record) return;
+    if (!confirm(`Delete scenario "${record.name}"?`)) return;
+    const wasActive = scenarioId === scenarioManager.activeScenarioId;
+    scenarioManager.scenarios = scenarioManager.scenarios.filter(s => s.id !== scenarioId);
+    if (wasActive) {
+        scenarioManager.activeScenarioId = scenarioManager.scenarios[0].id;
+        saveScenarioRegistry();
+        applyScenarioSnapshot(scenarioManager.scenarios[0].snapshot);
+        return;
+    }
+    saveScenarioRegistry();
+    renderScenarioBar();
+}
+
+// Render the always-visible scenario pill bar at the top of the sidebar
+function renderScenarioBar() {
+    const bar = document.getElementById('scenario-bar');
+    if (!bar) return;
+    const scenarios = scenarioManager.scenarios;
+    const activeId = scenarioManager.activeScenarioId;
+    const canDelete = scenarios.length > 1;
+    bar.innerHTML = scenarios.map(s => {
+        const isActive = s.id === activeId;
+        const delBtn = canDelete
+            ? `<span class="scenario-pill-del" onclick="event.stopPropagation();deleteScenario('${s.id}')" title="Delete">&times;</span>`
+            : '';
+        return `<button type="button" role="tab" class="scenario-pill${isActive ? ' active' : ''}" onclick="switchToScenario('${s.id}')" ondblclick="event.stopPropagation();renameScenario('${s.id}')" title="${escapeHtml(s.name)} — double-click to rename" aria-selected="${isActive}">${escapeHtml(s.name)}${delBtn}</button>`;
+    }).join('') + `<button type="button" class="scenario-pill-add" onclick="addScenario()" title="New scenario (copy of current)">+</button>`;
 }
 
 function restoreOpenSections(openSections) {
@@ -3532,7 +3542,7 @@ function renderTransactions() {
     
     document.getElementById('transactions-list').innerHTML = html;
 }
-function renderAll() { const uiState = getUIState(); renderUnits(); renderAccounts(); renderLoans(); renderTransactions(); applyUIState(uiState); renderScenarioManager(); }
+function renderAll() { const uiState = getUIState(); renderUnits(); renderAccounts(); renderLoans(); renderTransactions(); applyUIState(uiState); renderScenarioBar(); }
 
 // Debounced variant — coalesces rapid renderAll() calls (e.g. typing into a name field)
 let renderAllTimer = null;
@@ -4576,6 +4586,13 @@ function saveToLocalStorage() {
     try {
         const saveData = buildSerializableState();
         localStorage.setItem('financialForecastData', JSON.stringify(saveData));
+        // Auto-persist to the active scenario so edits are always reflected
+        const active = getActiveScenarioRecord();
+        if (active) {
+            active.snapshot = saveData;
+            active.updatedAt = saveData.timestamp;
+            saveScenarioRegistry();
+        }
     } catch (error) {
         console.error('Failed to save to local storage:', error);
     }
@@ -4604,8 +4621,7 @@ function clearLocalStorage() {
     try {
         localStorage.removeItem('financialForecastData');
         localStorage.removeItem(SCENARIO_STORAGE_KEY);
-        scenarioManager = normalizeScenarioRegistry(null);
-        renderScenarioManager();
+        scenarioManager = { activeScenarioId: null, scenarios: [] };
     } catch (error) {
         console.error('Failed to clear local storage:', error);
     }
@@ -6689,6 +6705,9 @@ async function initialize() {
         }
         }
     }
+
+    // Guarantee a Default scenario exists now that data is loaded
+    ensureDefaultScenario();
 
     const sidebarEl = document.getElementById('sidebar');
     sidebarEl.addEventListener('input', handleSidebarInput);
