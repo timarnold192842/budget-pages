@@ -784,6 +784,21 @@
         body.dark-mode .scenario-pill { color: #9ca3af; border-color: #2a3347; }
         body.dark-mode .scenario-pill:hover { background: rgba(255,255,255,0.06); }
         body.dark-mode .scenario-pill-add { border-color: #2a3347; color: #9ca3af; }
+        #scenario-apply-all-row {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 5px 11px 6px;
+            background: var(--sidebar-bg, #f8f9fa);
+            border-bottom: 1px solid var(--border-color, #dee2e6);
+            font-size: 0.8em;
+            color: #6b7280;
+            cursor: pointer;
+            user-select: none;
+        }
+        #scenario-apply-all-row:hover { color: #374151; }
+        body.dark-mode #scenario-apply-all-row { background: #1a2233; border-bottom-color: #2a3347; color: #9ca3af; }
+        body.dark-mode #scenario-apply-all-row:hover { color: #d1d5db; }
         .data-management-inner {
             padding: 10px;
             border: 1px solid #ddd;
@@ -1582,6 +1597,10 @@
     <div class="container">
         <div class="sidebar" id="sidebar">
             <div id="scenario-bar" role="tablist" aria-label="Scenarios"></div>
+            <label id="scenario-apply-all-row" title="When on, every edit is immediately copied to all scenarios">
+                <input type="checkbox" class="toggle-switch" id="apply-to-all-toggle" onchange="setApplyToAll(this.checked)">
+                Apply to all
+            </label>
             
             <details id="units-section" class="section-collapsible" open>
                 <summary class="section-header">
@@ -2182,6 +2201,47 @@ let state = {
     transactionGroups: []
 };
 const SCENARIO_STORAGE_KEY = 'financialForecastScenarios';
+let applyToAll = false;
+
+function setApplyToAll(value) {
+    applyToAll = !!value;
+    const toggle = document.getElementById('apply-to-all-toggle');
+    if (toggle) toggle.checked = applyToAll;
+}
+
+// Copy the current working snapshot's items into every non-active scenario,
+// preserving each scenario's own state for any items that don't exist in current.
+function syncSnapshotToAllScenarios(currentSnap) {
+    const collections = ['accounts', 'loans', 'transactions', 'units'];
+    const groupCollections = ['accountGroups', 'loanGroups', 'transactionGroups'];
+
+    for (const scenario of scenarioManager.scenarios) {
+        if (scenario.id === scenarioManager.activeScenarioId) continue;
+        const snap = scenario.snapshot;
+
+        // For each collection, overwrite items by ID; add new; remove deleted
+        for (const coll of collections) {
+            const currentItems = currentSnap[coll] || [];
+            const currentById = new Map(currentItems.map(i => [i.id, i]));
+            const existing = snap[coll] || [];
+            const existingIds = new Set(existing.map(i => i.id));
+
+            // Items that exist in both: overwrite with current version
+            // Items only in current: add them
+            // Items only in existing: remove (they were deleted in active scenario)
+            snap[coll] = currentItems.map(i => cloneData(i));
+        }
+
+        // Groups and plot options propagate wholesale
+        for (const coll of groupCollections) {
+            snap[coll] = cloneData(currentSnap[coll]);
+        }
+        snap.plotOptions = cloneData(currentSnap.plotOptions);
+        snap.transactionPlotOptions = cloneData(currentSnap.transactionPlotOptions);
+        scenario.updatedAt = currentSnap.timestamp;
+    }
+}
+
 let scenarioManager = {
     activeScenarioId: null,
     scenarios: []
@@ -4591,6 +4651,9 @@ function saveToLocalStorage() {
         if (active) {
             active.snapshot = saveData;
             active.updatedAt = saveData.timestamp;
+            if (applyToAll && scenarioManager.scenarios.length > 1) {
+                syncSnapshotToAllScenarios(saveData);
+            }
             saveScenarioRegistry();
         }
     } catch (error) {
