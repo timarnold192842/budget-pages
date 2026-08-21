@@ -2511,10 +2511,15 @@ function getActiveScenarioRecord() {
 }
 
 function applyScenarioSnapshot(snapshot) {
+    // Preserve current graph bounds — switching scenarios should not move the zoom
+    const savedStart = currentViewStart;
+    const savedEnd = currentViewEnd;
     const { applied, openSections } = applyImportedData(snapshot);
     if (!applied) {
         return false;
     }
+    currentViewStart = savedStart;
+    currentViewEnd = savedEnd;
     restoreOpenSections(openSections);
     renderAll();
     recalculateAndDraw();
