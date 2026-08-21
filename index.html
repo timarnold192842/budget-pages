@@ -711,16 +711,19 @@
             color: #9ca3af;
         }
         /* --- Scenario bar (top of sidebar) --- */
+        #scenario-sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: var(--sidebar-bg, #f8f9fa);
+        }
+        body.dark-mode #scenario-sticky-header { background: #1a2233; }
         #scenario-bar {
             display: flex;
             flex-wrap: wrap;
             gap: 5px;
             padding: 8px 10px;
-            background: var(--sidebar-bg, #f8f9fa);
-            border-bottom: 1px solid var(--border-color, #dee2e6);
-            position: sticky;
-            top: 0;
-            z-index: 10;
+            background: transparent;
         }
         .scenario-pill {
             display: inline-flex;
@@ -780,7 +783,6 @@
             flex-shrink: 0;
         }
         .scenario-pill-add:hover { border-color: var(--primary-color, #007bff); color: var(--primary-color, #007bff); }
-        body.dark-mode #scenario-bar { background: #1a2233; border-bottom-color: #2a3347; }
         body.dark-mode .scenario-pill { color: #9ca3af; border-color: #2a3347; }
         body.dark-mode .scenario-pill:hover { background: rgba(255,255,255,0.06); }
         body.dark-mode .scenario-pill-add { border-color: #2a3347; color: #9ca3af; }
@@ -788,8 +790,8 @@
             display: flex;
             align-items: center;
             gap: 7px;
-            padding: 5px 11px 6px;
-            background: var(--sidebar-bg, #f8f9fa);
+            padding: 4px 11px 7px;
+            background: transparent;
             border-bottom: 1px solid var(--border-color, #dee2e6);
             font-size: 0.8em;
             color: #6b7280;
@@ -797,7 +799,7 @@
             user-select: none;
         }
         #scenario-apply-all-row:hover { color: #374151; }
-        body.dark-mode #scenario-apply-all-row { background: #1a2233; border-bottom-color: #2a3347; color: #9ca3af; }
+        body.dark-mode #scenario-apply-all-row { border-bottom-color: #2a3347; color: #9ca3af; }
         body.dark-mode #scenario-apply-all-row:hover { color: #d1d5db; }
         .data-management-inner {
             padding: 10px;
@@ -1596,11 +1598,13 @@
     <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
     <div class="container">
         <div class="sidebar" id="sidebar">
-            <div id="scenario-bar" role="tablist" aria-label="Scenarios"></div>
-            <label id="scenario-apply-all-row" title="When on, every edit is immediately copied to all scenarios">
-                <input type="checkbox" class="toggle-switch" id="apply-to-all-toggle" onchange="setApplyToAll(this.checked)">
-                Apply to all
-            </label>
+            <div id="scenario-sticky-header">
+                <div id="scenario-bar" role="tablist" aria-label="Scenarios"></div>
+                <label id="scenario-apply-all-row" title="When on, every edit is immediately copied to all scenarios">
+                    <input type="checkbox" class="toggle-switch" id="apply-to-all-toggle" onchange="setApplyToAll(this.checked)">
+                    Apply to all
+                </label>
+            </div>
             
             <details id="units-section" class="section-collapsible" open>
                 <summary class="section-header">
