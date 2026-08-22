@@ -2521,6 +2521,8 @@ function applyScenarioSnapshot(snapshot) {
     // Preserve current graph bounds — switching scenarios should not move the zoom
     const savedStart = currentViewStart;
     const savedEnd = currentViewEnd;
+    // Preserve Y-axis freeze state — scenario switches don't change freeze behavior
+    const savedYAxisFrozen = state.yAxisFrozen;
     const { applied, openSections } = applyImportedData(snapshot);
     if (!applied) {
         _inScenarioSwitch = false;
@@ -2529,6 +2531,12 @@ function applyScenarioSnapshot(snapshot) {
     }
     currentViewStart = savedStart;
     currentViewEnd = savedEnd;
+    state.yAxisFrozen = savedYAxisFrozen;
+    // If not frozen, clear any stale axis bounds the snapshot may have carried
+    if (!state.yAxisFrozen && chartInstance) {
+        clearAxisRange(chartInstance, 'y');
+        clearAxisRange(chartInstance, 'y1');
+    }
     restoreOpenSections(openSections);
     renderAll();
     recalculateAndDraw();
