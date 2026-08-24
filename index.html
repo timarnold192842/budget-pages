@@ -1615,6 +1615,15 @@
         .loan-equity.loan-equity-negative { color: #dc3545; }
         body.dark-mode .loan-equity { color: #4ade80; }
         body.dark-mode .loan-equity.loan-equity-negative { color: #f87171; }
+        .tx-contingent-badge {
+            display: inline-block;
+            margin-left: 5px;
+            font-size: 0.72em;
+            color: #6b7280;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        body.dark-mode .tx-contingent-badge { color: #9ca3af; }
         /* Net Worth R-axis toggle button: hidden until NW is enabled */
         .nw-axis-btn {
             opacity: 0.35;
@@ -2970,7 +2979,7 @@ function createField(item, key, type = 'text', options = []) {
         return `<div><label for="${item.id}_${key}">${key.replace(/_/g, ' ')}</label><select id="${item.id}_${key}" data-id="${item.id}" data-key="${key}">${h}</select></div>`; 
     } 
     if (type === 'date') {
-        return `<div><label for="${item.id}_${key}">${key.replace(/_/g, ' ')}</label><div class="date-field-row"><input type="${type}" id="${item.id}_${key}" data-id="${item.id}" data-key="${key}" value="${escapeHtml(v)}"><div class="date-nudge-group"><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'month', -1)" title="Minus 1 month">\u22121mo</button><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'week', -1)" title="Minus 1 week">\u22121wk</button><button type="button" class="btn-today" onclick="setDateToToday('${item.id}', '${key}')" title="Set to today">Today</button><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'week', 1)" title="Plus 1 week">+1wk</button><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'month', 1)" title="Plus 1 month">+1mo</button></div></div></div>`;
+        return `<div><label for="${item.id}_${key}">${key.replace(/_/g, ' ')}</label><div class="date-field-row"><input type="${type}" id="${item.id}_${key}" data-id="${item.id}" data-key="${key}" value="${escapeHtml(v)}"><div class="date-nudge-group"><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'month', -1)" title="Minus 1 month">\u22121m</button><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'week', -1)" title="Minus 1 week">\u22121w</button><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'day', -1)" title="Minus 1 day">\u22121d</button><button type="button" class="btn-today" onclick="setDateToToday('${item.id}', '${key}')" title="Set to today">Today</button><button type="button" class="btn-nudge" onclick="clearDate('${item.id}', '${key}')" title="Clear date">Clear</button><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'day', 1)" title="Plus 1 day">+1d</button><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'week', 1)" title="Plus 1 week">+1w</button><button type="button" class="btn-nudge" onclick="nudgeDate('${item.id}', '${key}', 'month', 1)" title="Plus 1 month">+1m</button></div></div></div>`;
     }
     return `<div><label for="${item.id}_${key}">${key.replace(/_/g, ' ')}</label><input type="${type}" id="${item.id}_${key}" data-id="${item.id}" data-key="${key}" value="${escapeHtml(v)}"></div>`; 
 }
@@ -2978,6 +2987,12 @@ function setDateToToday(itemId, key) {
     const input = document.getElementById(`${itemId}_${key}`);
     if (!input) return;
     input.value = toYMD(new Date());
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+function clearDate(itemId, key) {
+    const input = document.getElementById(`${itemId}_${key}`);
+    if (!input) return;
+    input.value = '';
     input.dispatchEvent(new Event('change', { bubbles: true }));
 }
 function nudgeDate(itemId, key, unit, amount) {
@@ -2989,7 +3004,9 @@ function nudgeDate(itemId, key, unit, amount) {
     if (m) {
         base = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
     }
-    if (unit === 'week') {
+    if (unit === 'day') {
+        base.setDate(base.getDate() + amount);
+    } else if (unit === 'week') {
         base.setDate(base.getDate() + amount * 7);
     } else if (unit === 'month') {
         const targetDay = base.getDate();
@@ -3383,8 +3400,15 @@ function isTxFullyPast(tx) {
     }
     return false;
 }
+function txContingentBadge(tx) {
+    if (!tx.linkedAccountId) return '';
+    const acc = state.accounts.find(a => a.id === tx.linkedAccountId);
+    if (!acc) return '';
+    const soldLabel = acc.saleDate ? ` → sold ${acc.saleDate}` : '';
+    return `<span class="tx-contingent-badge" title="Stops when ${escapeHtml(acc.name)} is sold">&#x26D3; ${escapeHtml(acc.name)}${escapeHtml(soldLabel)}</span>`;
+}
 function txSummaryName(tx) {
-    return `<span class="summary-name" data-summary-field="name" title="${tx.name}">${getTypeIndicator(tx.type, tx)}${tx.name}${subtitleHtml(buildTxSubtitleParts(tx))}</span>`;
+    return `<span class="summary-name" data-summary-field="name" title="${tx.name}">${getTypeIndicator(tx.type, tx)}${tx.name}${txContingentBadge(tx)}${subtitleHtml(buildTxSubtitleParts(tx))}</span>`;
 }
 function renderLoans() { 
     const ungroupedLoans = state.loans.filter(loan => !getItemGroup('loan', loan.id));
