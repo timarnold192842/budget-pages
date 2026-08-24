@@ -5264,6 +5264,7 @@ function txLinkedAssetField(tx) {
 // Returns a select field for picking the loan's linked asset account
 function loanLinkedAccountField(loan) {
     const options = state.accounts.map(a => {
+        const growthPct = (a.annual_growth - 1) * 100;
         const sign = growthPct >= 0 ? '+' : '';
         return `<option value="${escapeHtml(a.id)}" ${loan.linkedAccountId === a.id ? 'selected' : ''}>${escapeHtml(a.name)} (${sign}${growthPct.toFixed(1)}%/yr)</option>`;
     }).join('');
