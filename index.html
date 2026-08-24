@@ -2425,6 +2425,8 @@ function applyImportedData(importData) {
     }
 
     state.yAxisFrozen = importData.yAxisFrozen || null;
+    if (typeof importData.netWorthVisible === 'boolean') showNetWorth = importData.netWorthVisible;
+    if (typeof importData.netWorthRightAxis === 'boolean') netWorthRightAxis = importData.netWorthRightAxis;
 
     // Ensure required collections exist even if not provided
     if (!Array.isArray(state.accounts)) state.accounts = [];
@@ -2528,6 +2530,8 @@ function buildSerializableState() {
         plotOptions: cloneData(state.plotOptions),
         transactionPlotOptions: cloneData(state.transactionPlotOptions),
         yAxisFrozen: state.yAxisFrozen || null,
+        netWorthVisible: showNetWorth,
+        netWorthRightAxis: netWorthRightAxis,
         viewRange: {
             start: currentViewStart.toISOString(),
             end: currentViewEnd.toISOString()
@@ -3761,7 +3765,13 @@ function renderTransactions() {
     
     document.getElementById('transactions-list').innerHTML = html;
 }
-function renderAll() { const uiState = getUIState(); renderUnits(); renderAccounts(); renderLoans(); renderTransactions(); applyUIState(uiState); renderScenarioBar(); }
+function syncNetWorthUI() {
+    const btn = document.getElementById('net-worth-btn');
+    const axisBtn = document.getElementById('net-worth-axis-btn');
+    if (btn) { btn.classList.toggle('active', showNetWorth); btn.setAttribute('aria-pressed', String(showNetWorth)); }
+    if (axisBtn) { axisBtn.classList.toggle('active', netWorthRightAxis); axisBtn.classList.toggle('nw-axis-visible', showNetWorth); axisBtn.setAttribute('aria-pressed', String(netWorthRightAxis)); }
+}
+function renderAll() { const uiState = getUIState(); renderUnits(); renderAccounts(); renderLoans(); renderTransactions(); applyUIState(uiState); renderScenarioBar(); syncNetWorthUI(); }
 
 // Debounced variant — coalesces rapid renderAll() calls (e.g. typing into a name field)
 let renderAllTimer = null;
