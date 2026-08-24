@@ -3233,6 +3233,8 @@ function renderAccounts() {
     });
     
     document.getElementById('accounts-list').innerHTML = html;
+}
+function formatPayoffShort(dateStr) {
     const d = parseYMD(dateStr);
     if (!d) return '';
     return `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${String(d.getUTCFullYear()).slice(-2)}`;
