@@ -1591,6 +1591,20 @@
         body.dark-mode .toast { background: rgba(245, 245, 245, 0.94); color: #1b1b1b; }
         body.dark-mode .toast.toast-error { background: rgba(220, 64, 64, 0.96); color: #fff; }
         body.dark-mode .toast.toast-success { background: rgba(60, 170, 95, 0.96); color: #fff; }
+        /* Transactions entirely in the past */
+        details.tx-stale > summary {
+            border-left: 3px solid #f97316;
+        }
+        details.tx-stale > summary::after {
+            content: '⏰';
+            font-size: 0.8em;
+            margin-left: 4px;
+            opacity: 0.8;
+            flex-shrink: 0;
+        }
+        body.dark-mode details.tx-stale > summary {
+            border-left-color: #fb923c;
+        }
         
     </style>
 </head>
@@ -3320,6 +3334,20 @@ function getTypeIndicator(type, tx) {
     }
     return `<span class="transaction-type-indicator ${indicator.class}" title="${type}">${indicator.text}</span>`;
 }
+// Returns true when a transaction's activity window is entirely before today
+function isTxFullyPast(tx) {
+    const today = todayUTC();
+    if (tx.type === 'OneTime') {
+        const d = parseYMD(tx.start_date);
+        return !!(d && d < today);
+    }
+    // Recurring: only fully past when an end_date exists and has passed
+    if (tx.end_date) {
+        const d = parseYMD(tx.end_date) || new Date(tx.end_date);
+        return !!(d && !isNaN(d.getTime()) && d < today);
+    }
+    return false;
+}
 function txSummaryName(tx) {
     return `<span class="summary-name" data-summary-field="name" title="${tx.name}">${getTypeIndicator(tx.type, tx)}${tx.name}${subtitleHtml(buildTxSubtitleParts(tx))}</span>`;
 }
@@ -3551,7 +3579,7 @@ function renderTransactions() {
                                 case 'Annual': typeSpecificFields = createField(tx, 'day_of_month', 'number') + createField(tx, 'month_of_year', 'number'); break;
                             }
                             
-                            return `<details data-id="${tx.id}" class="draggable-item" draggable="true" data-type="transaction">
+                            return `<details data-id="${tx.id}" class="draggable-item${isTxFullyPast(tx) ? ' tx-stale' : ''}" draggable="true" data-type="transaction">
                                 <summary>
                                     <span class="summary-toggles">
                                         <input type="checkbox" class="toggle-switch summary-checkbox" data-enable-tx-id="${tx.id}" ${tx.isEnabled ? 'checked' : ''} title="Enable/Disable">
@@ -3598,7 +3626,7 @@ function renderTransactions() {
                 case 'Annual': typeSpecificFields = createField(tx, 'day_of_month', 'number') + createField(tx, 'month_of_year', 'number'); break;
             }
             
-            html += `<details data-id="${tx.id}" class="draggable-item" draggable="true" data-type="transaction">
+            html += `<details data-id="${tx.id}" class="draggable-item${isTxFullyPast(tx) ? ' tx-stale' : ''}" draggable="true" data-type="transaction">
                 <summary>
                     <span class="summary-toggles">
                         <input type="checkbox" class="toggle-switch summary-checkbox" data-enable-tx-id="${tx.id}" ${tx.isEnabled ? 'checked' : ''} title="Enable/Disable">
