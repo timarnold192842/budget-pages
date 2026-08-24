@@ -1644,6 +1644,15 @@
             white-space: nowrap;
         }
         body.dark-mode .tx-contingent-badge { color: #9ca3af; }
+        .acc-sale-badge {
+            display: inline-block;
+            margin-left: 5px;
+            font-size: 0.72em;
+            color: #f97316;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        body.dark-mode .acc-sale-badge { color: #fb923c; }
         /* Net Worth R-axis toggle button: hidden until NW is enabled */
         .nw-axis-btn {
             opacity: 0.35;
@@ -3210,7 +3219,7 @@ function renderAccounts() {
                                         <input type="checkbox" class="eye-toggle summary-checkbox" data-plot-item="${acc.name}" ${state.plotOptions[acc.name] ? 'checked' : ''} title="Show/Hide on chart">
                                         <input type="checkbox" class="axis-toggle" data-id="${acc.id}" data-key="rightAxis" ${acc.rightAxis ? 'checked' : ''} title="Right Y-Axis">
                                     </span>
-                                    <span class="summary-name" data-summary-field="name" title="${acc.name}">${acc.name}</span>
+                                    <span class="summary-name" data-summary-field="name" title="${acc.name}">${acc.name}${accSaleBadge(acc)}</span>
                                     <span class="summary-info">
                                         <input type="text" 
                                                data-id="${acc.id}" 
@@ -3246,7 +3255,7 @@ function renderAccounts() {
                         <input type="checkbox" class="eye-toggle summary-checkbox" data-plot-item="${acc.name}" ${state.plotOptions[acc.name] ? 'checked' : ''} title="Show/Hide on chart">
                         <input type="checkbox" class="axis-toggle" data-id="${acc.id}" data-key="rightAxis" ${acc.rightAxis ? 'checked' : ''} title="Right Y-Axis">
                     </span>
-                    <span class="summary-name" data-summary-field="name" title="${acc.name}">${acc.name}</span>
+                    <span class="summary-name" data-summary-field="name" title="${acc.name}">${acc.name}${accSaleBadge(acc)}</span>
                     <span class="summary-info">
                         <input type="text" 
                                data-id="${acc.id}" 
@@ -3419,6 +3428,10 @@ function isTxFullyPast(tx) {
         return !!(d && !isNaN(d.getTime()) && d < today);
     }
     return false;
+}
+function accSaleBadge(acc) {
+    if (!acc.saleDate) return '';
+    return `<span class="acc-sale-badge" title="Scheduled sale: ${escapeHtml(acc.saleDate)}">→ ${escapeHtml(acc.saleDate)}</span>`;
 }
 function txContingentBadge(tx) {
     if (!tx.linkedAccountId) return '';
