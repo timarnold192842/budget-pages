@@ -4680,7 +4680,7 @@ function drawChart(data, updateMode = 'active') {
         });
         
         // Update right axis visibility
-        const hasRightAxisItems = rightAxisItems.length > 0;
+        const hasRightAxisItems = rightAxisItems.length > 0 || (showNetWorth && netWorthRightAxis);
         chartInstance.options.scales.y1.display = hasRightAxisItems;
         
         // Ensure minimum y values never go above $0
