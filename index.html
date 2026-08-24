@@ -6329,6 +6329,36 @@ function handleSidebarInput(e) {
                 }
                 // Recalculate since units affect the USD conversion values
                 // (the trailing recalculateAndDraw() below handles this; both are debounced)
+            } else if (key === 'saleDate' && c === 'accounts') {
+                // Live-update the sale-date badge in the collapsed summary row
+                const nameSpan = document.querySelector(`details[data-id="${id}"] .summary-name`);
+                if (nameSpan) {
+                    nameSpan.querySelector('.acc-sale-badge')?.remove();
+                    if (item.saleDate) {
+                        const badge = document.createElement('span');
+                        badge.className = 'acc-sale-badge';
+                        badge.title = `Scheduled sale: ${item.saleDate}`;
+                        badge.textContent = `\u2192 ${item.saleDate}`;
+                        nameSpan.appendChild(badge);
+                    }
+                }
+            } else if (key === 'linkedAccountId') {
+                // Live-update the contingent-asset badge in the collapsed summary row
+                const nameSpan = document.querySelector(`details[data-id="${id}"] .summary-name`);
+                if (nameSpan) {
+                    nameSpan.querySelector('.tx-contingent-badge')?.remove();
+                    if (item.linkedAccountId) {
+                        const linkedAcc = state.accounts.find(a => a.id === item.linkedAccountId);
+                        if (linkedAcc) {
+                            const badge = document.createElement('span');
+                            badge.className = 'tx-contingent-badge';
+                            const soldLabel = linkedAcc.saleDate ? ` \u2192 sold ${linkedAcc.saleDate}` : '';
+                            badge.title = `Stops when ${linkedAcc.name} is sold`;
+                            badge.innerHTML = `&#x26D3; ${escapeHtml(linkedAcc.name)}${escapeHtml(soldLabel)}`;
+                            nameSpan.appendChild(badge);
+                        }
+                    }
+                }
             }
             break;
         }
