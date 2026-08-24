@@ -1605,6 +1605,16 @@
         body.dark-mode details.tx-stale > summary {
             border-left-color: #fb923c;
         }
+        /* Loan equity / linked asset badge */
+        .loan-equity {
+            font-size: 0.73em;
+            color: #16a34a;
+            display: block;
+            white-space: nowrap;
+        }
+        .loan-equity.loan-equity-negative { color: #dc3545; }
+        body.dark-mode .loan-equity { color: #4ade80; }
+        body.dark-mode .loan-equity.loan-equity-negative { color: #f87171; }
         
     </style>
 </head>
@@ -1713,6 +1723,7 @@
                 <div class="chart-actions">
                     <button id="milestones-btn" class="freeze-y-btn" onclick="toggleMilestones()" title="Show milestone markers on chart" aria-label="Toggle milestones" aria-pressed="false">🏁 Milestones</button>
                     <button id="compare-btn" class="freeze-y-btn" onclick="toggleScenarioOverlay()" title="Compare net worth across scenarios" aria-label="Compare scenarios" aria-pressed="false">📊 Compare</button>
+                    <button id="net-worth-btn" class="freeze-y-btn" onclick="toggleNetWorth()" title="Show Net Worth: total assets minus total debts" aria-label="Toggle Net Worth" aria-pressed="false">💰 Net Worth</button>
                     <button id="freeze-y-btn" class="freeze-y-btn" onclick="toggleFreezeY()" title="Freeze Y-axis scale" aria-label="Freeze Y-axis scale">&#x1f513; Y</button>
                     <button class="legend-toggle-btn" onclick="toggleLegend()" title="Toggle legend panel">Legend</button>
                     <button id="mode-toggle-btn" class="mode-toggle-btn" onclick="toggleTheme()" aria-pressed="false" title="Toggle color theme"><svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
@@ -2413,6 +2424,9 @@ function applyImportedData(importData) {
     state.loans.forEach(loan => {
         if (loan.isEnabled === undefined) {
             loan.isEnabled = true;
+        }
+        if (loan.linkedAccountId === undefined) {
+            loan.linkedAccountId = '';
         }
     });
 
@@ -3435,6 +3449,7 @@ function renderLoans() {
                                                readonly
                                                title="Click to edit initial balance">
                                         ${showCurrent ? `<span class="loan-current-balance" title="Estimated balance today">${formatCurrency(currentBal)}</span>` : ''}
+                            ${loanEquityBadge(loan)}
                                     </span>
                                     <button title="Delete" class="btn-delete-icon" data-delete-id="${loan.id}" data-type="loan">&times;</button>
                                 </summary>
@@ -3449,6 +3464,7 @@ function renderLoans() {
                                         ${createField(loan, 'early_payoff_date', 'date')} 
                                         ${createField(loan, 'day_of_month', 'number')} 
                                         ${createField(loan, 'tags')} 
+                                        ${loanLinkedAccountField(loan)}
                                     </div>
                                 </div>
                             </details>`
@@ -3478,6 +3494,7 @@ function renderLoans() {
                                readonly
                                title="Click to edit initial balance">
                         ${showCurrent3 ? `<span class="loan-current-balance" title="Estimated balance today">${formatCurrency(currentBal3)}</span>` : ''}
+                    ${loanEquityBadge(loan)}
                     </span>
                     <button title="Delete" class="btn-delete-icon" data-delete-id="${loan.id}" data-type="loan">&times;</button>
                 </summary>
@@ -3492,6 +3509,7 @@ function renderLoans() {
                         ${createField(loan, 'early_payoff_date', 'date')} 
                         ${createField(loan, 'day_of_month', 'number')} 
                         ${createField(loan, 'tags')} 
+                        ${loanLinkedAccountField(loan)}
                     </div>
                 </div>
             </details>`;
@@ -3727,7 +3745,8 @@ function addLoan(groupId) {
         day_of_month: 1,
         tags: 'debt',
         rightAxis: false,
-        isEnabled: true
+        isEnabled: true,
+        linkedAccountId: ''
     };
 
     state.loans.unshift(newLoan);
@@ -4580,9 +4599,10 @@ function drawChart(data, updateMode = 'active') {
         const currentLabels = chartInstance.data.datasets.map(d => d.label);
         const newLabels = itemsToPlot;
         
-        // Remove datasets that are no longer plotted
+        // Remove datasets that are no longer plotted (preserve special synthetic datasets)
         for (let i = chartInstance.data.datasets.length - 1; i >= 0; i--) {
             const dataset = chartInstance.data.datasets[i];
+            if (dataset._netWorth) continue;
             if (!newLabels.includes(dataset.label)) {
                 chartInstance.data.datasets.splice(i, 1);
             }
@@ -4683,6 +4703,12 @@ function drawChart(data, updateMode = 'active') {
         }, 100);
         
         // Use active mode here because we're updating data, not just view
+        // Refresh Net Worth overlay dataset
+        chartInstance.data.datasets = chartInstance.data.datasets.filter(ds => !ds._netWorth);
+        if (showNetWorth) {
+            const nwDs = buildNetWorthDataset(data);
+            if (nwDs) chartInstance.data.datasets.push(nwDs);
+        }
         updateChartTheme(isDarkModeActive());
         performanceProfile.start('Chart Data Update');
         chartInstance.update(updateMode);
@@ -5099,6 +5125,67 @@ function adjustMonths(months) {
 
 // Module-level UI state (not persisted; purely view-level)
 let showMilestones = false;
+let showNetWorth = false;
+
+// Toggle the Net Worth overlay line on the main chart
+function toggleNetWorth() {
+    showNetWorth = !showNetWorth;
+    const btn = document.getElementById('net-worth-btn');
+    if (btn) {
+        btn.classList.toggle('active', showNetWorth);
+        btn.setAttribute('aria-pressed', String(showNetWorth));
+    }
+    recalculateAndDraw();
+}
+
+// Build the Net Worth dataset to inject into the chart
+function buildNetWorthDataset(data) {
+    const nwSeries = computeNetWorthSeries(data);
+    if (!nwSeries) return null;
+    return {
+        label: 'Net Worth',
+        data: nwSeries,
+        borderColor: '#1a7a4a',
+        backgroundColor: 'transparent',
+        borderWidth: 2.5,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        pointBackgroundColor: 'transparent',
+        pointBorderColor: 'transparent',
+        fill: false,
+        tension: 0.1,
+        yAxisID: 'y',
+        _netWorth: true
+    };
+}
+
+// --- Loan linked-asset helpers ---
+// Returns HTML badge showing equity for a loan that has a linked asset account
+function loanEquityBadge(loan) {
+    if (!loan.linkedAccountId) return '';
+    const acc = state.accounts.find(a => a.id === loan.linkedAccountId);
+    if (!acc) return '';
+    const assetVal = acc.balance || 0;
+    const loanBal = getLoanCurrentBalance(loan);
+    const equity = assetVal - loanBal;
+    const pct = assetVal > 0 ? Math.round((equity / assetVal) * 100) : 0;
+    const growthPct = (acc.annual_growth - 1) * 100;
+    const growthDesc = growthPct >= 0
+        ? `↑${growthPct.toFixed(1)}%/yr appreciation`
+        : `↓${Math.abs(growthPct).toFixed(1)}%/yr depreciation`;
+    const cls = equity >= 0 ? 'loan-equity' : 'loan-equity loan-equity-negative';
+    return `<span class="${cls}" title="${escapeHtml(acc.name)}: ${formatCurrency(assetVal)} · ${growthDesc}">${equity >= 0 ? '+' : ''}${formatCurrency(equity)} equity (${pct}%)</span>`;
+}
+
+// Returns a select field for picking the loan's linked asset account
+function loanLinkedAccountField(loan) {
+    const options = state.accounts.map(a => {
+        const growthPct = (a.annual_growth - 1) * 100;
+        const sign = growthPct >= 0 ? '+' : '';
+        return `<option value="${escapeHtml(a.id)}" ${loan.linkedAccountId === a.id ? 'selected' : ''}>${escapeHtml(a.name)} (${sign}${growthPct.toFixed(1)}%/yr)</option>`;
+    }).join('');
+    return `<div><label for="${loan.id}_linkedAccountId">linked asset</label><select id="${loan.id}_linkedAccountId" data-id="${loan.id}" data-key="linkedAccountId"><option value="">— none —</option>${options}</select></div>`;
+}
 const MILESTONE_NW_THRESHOLDS = [100000, 250000, 500000, 1000000, 2500000, 5000000, 10000000, 25000000];
 const scenarioOverlay = { enabled: false, unitId: null, scenarios: new Set() };
 
