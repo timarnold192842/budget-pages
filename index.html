@@ -2454,6 +2454,9 @@ function applyImportedData(importData) {
         if (!tx.units) {
             tx.units = 'usd';
         }
+        if (tx.linkedAccountId === undefined) {
+            tx.linkedAccountId = '';
+        }
         if (state.transactionPlotOptions[tx.id] === undefined) {
             state.transactionPlotOptions[tx.id] = true;
         }
@@ -3644,6 +3647,7 @@ function renderTransactions() {
                                         ${createField(tx, 'from_account', 'select', accountNames)}
                                         ${createField(tx, 'to_account', 'select', accountNames)}
                                         ${typeSpecificFields}
+                                        ${txLinkedAssetField(tx)}
                                     </div>
                                 </div>
                             </details>`;
@@ -3691,6 +3695,7 @@ function renderTransactions() {
                         ${createField(tx, 'from_account', 'select', accountNames)}
                         ${createField(tx, 'to_account', 'select', accountNames)}
                         ${typeSpecificFields}
+                        ${txLinkedAssetField(tx)}
                     </div>
                 </div>
             </details>`;
@@ -3806,7 +3811,8 @@ function addTransaction(groupId) {
         units: 'usd',
         start_date: toYMD(new Date()),
         from_account: 'Cash',
-        isEnabled: true
+        isEnabled: true,
+        linkedAccountId: ''
     };
 
     state.transactions.unshift(newTransaction);
@@ -4215,7 +4221,18 @@ function calculateBalances() {
     performanceProfile.start('Generate Transaction Dates');
 
     state.transactions.filter(tx => tx.isEnabled).forEach(txData => {
-        new Transaction(txData).generateDates(end).forEach(t => addTxToMap(t.date, t.amount, txData));
+        // Contingent transactions: cap end_date at the linked asset's sale date
+        let effectiveTxData = txData;
+        if (txData.linkedAccountId) {
+            const linkedAcc = state.accounts.find(a => a.id === txData.linkedAccountId);
+            if (linkedAcc?.saleDate) {
+                const capDate = linkedAcc.saleDate;
+                if (!txData.end_date || capDate < txData.end_date) {
+                    effectiveTxData = { ...txData, end_date: capDate };
+                }
+            }
+        }
+        new Transaction(effectiveTxData).generateDates(end).forEach(t => addTxToMap(t.date, t.amount, txData));
     });
     state.loans.filter(loan => loan.isEnabled).forEach(loan => { 
         const earlyPayoff = parseYMD(loan.early_payoff_date);
@@ -5236,10 +5253,17 @@ function loanEquityBadge(loan) {
     return `<span class="${cls}" title="${escapeHtml(acc.name)}: ${formatCurrency(assetVal)} · ${growthDesc}">${equity >= 0 ? '+' : ''}${formatCurrency(equity)} equity (${pct}%)</span>`;
 }
 
+// Returns a select field for picking the asset account a transaction is contingent on
+function txLinkedAssetField(tx) {
+    const options = state.accounts.map(a => {
+        const hasSale = a.saleDate ? ` → sold ${a.saleDate}` : '';
+        return `<option value="${escapeHtml(a.id)}" ${tx.linkedAccountId === a.id ? 'selected' : ''}>${escapeHtml(a.name)}${escapeHtml(hasSale)}</option>`;
+    }).join('');
+    return `<div><label for="${tx.id}_linkedAccountId">stops when asset sold</label><select id="${tx.id}_linkedAccountId" data-id="${tx.id}" data-key="linkedAccountId"><option value="">— always active —</option>${options}</select></div>`;
+}
 // Returns a select field for picking the loan's linked asset account
 function loanLinkedAccountField(loan) {
     const options = state.accounts.map(a => {
-        const growthPct = (a.annual_growth - 1) * 100;
         const sign = growthPct >= 0 ? '+' : '';
         return `<option value="${escapeHtml(a.id)}" ${loan.linkedAccountId === a.id ? 'selected' : ''}>${escapeHtml(a.name)} (${sign}${growthPct.toFixed(1)}%/yr)</option>`;
     }).join('');
