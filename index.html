@@ -2419,6 +2419,9 @@ function applyImportedData(importData) {
         if (!acc.units) {
             acc.units = 'usd';
         }
+        if (acc.saleDate === undefined) {
+            acc.saleDate = '';
+        }
     });
 
     state.units.forEach(unit => {
@@ -3186,6 +3189,7 @@ function renderAccounts() {
                                         ${createField(acc, 'annual_growth', 'number')} 
                                         ${createField(acc, 'units', 'select', getUnitOptions())}
                                         ${createField(acc, 'tags')} 
+                                        ${createField(acc, 'saleDate', 'date')}
                                     </div>
                                 </div>
                             </details>`
@@ -3221,6 +3225,7 @@ function renderAccounts() {
                         ${createField(acc, 'annual_growth', 'number')} 
                         ${createField(acc, 'units', 'select', getUnitOptions())}
                         ${createField(acc, 'tags')} 
+                        ${createField(acc, 'saleDate', 'date')}
                     </div>
                 </div>
             </details>`;
@@ -3228,8 +3233,6 @@ function renderAccounts() {
     });
     
     document.getElementById('accounts-list').innerHTML = html;
-}
-function formatPayoffShort(dateStr) {
     const d = parseYMD(dateStr);
     if (!d) return '';
     return `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${String(d.getUTCFullYear()).slice(-2)}`;
@@ -3713,7 +3716,8 @@ function addAccount(groupId) {
         annual_growth: 1.0,
         units: 'usd',
         tags: '',
-        rightAxis: false
+        rightAxis: false,
+        saleDate: ''
     };
 
     state.accounts.unshift(newAccount);
@@ -4346,6 +4350,31 @@ function calculateBalances() {
                     console.warn('⚠️ Transaction with no from_account or to_account:', tx);
                 }
             });
+        }
+        // --- Asset sale events ---
+        // For any account with a saleDate matching today: zero the asset, zero its linked loan,
+        // and credit Cash with the net equity (assetValue - loanBalance).
+        for (const acc of state.accounts) {
+            if (!acc.saleDate) continue;
+            if (toYMD(parseYMD(acc.saleDate) || new Date(acc.saleDate)) !== ymd) continue;
+            const assetEntry = accountData[acc.name];
+            if (!assetEntry) continue;
+            const assetVal = assetEntry.balance[i] || 0;
+            // Find an enabled loan linked to this account
+            const linkedLoan = state.loans.find(l => l.isEnabled && l.linkedAccountId === acc.id);
+            const loanBal = linkedLoan ? (loanData[linkedLoan.name]?.balance[i] || 0) : 0;
+            const netProceeds = assetVal - loanBal;
+            // Zero the asset from today onward (growth * 0 = 0, so future days stay 0)
+            assetEntry.nativeBalance[i] = 0;
+            assetEntry.balance[i] = 0;
+            // Zero the linked loan
+            if (linkedLoan && loanData[linkedLoan.name]) {
+                loanData[linkedLoan.name].balance[i] = 0;
+            }
+            // Credit net proceeds to Cash
+            if (netProceeds !== 0 && accountData[cashAccountName]) {
+                applyAccountDelta(accountData[cashAccountName], dates[i], i, netProceeds);
+            }
         }
         for (const n in loanData) {
             if (loanData[n].payoffDate && toYMD(loanData[n].payoffDate) === ymd && loanData[n].balance[i] > 0) {
