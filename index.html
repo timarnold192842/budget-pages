@@ -7139,6 +7139,12 @@ async function initialize() {
         btn.innerHTML = '&#x1f512; Y';
         btn.title = 'Unfreeze Y-axis scale';
     }
+
+    // Post-init: if Net Worth was saved as visible, trigger a second draw
+    // after the chart has been created (update path reliably injects the dataset)
+    if (showNetWorth) {
+        setTimeout(() => recalculateAndDraw(), 350);
+    }
 }
 
 // End of script - initialization handled above
