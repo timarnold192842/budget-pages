@@ -2893,7 +2893,8 @@ function generateDataHash() {
             balance: a.balance,
             annual_growth: a.annual_growth,
             units: a.units,
-            rightAxis: a.rightAxis
+            rightAxis: a.rightAxis,
+            saleDate: a.saleDate || ''
         })),
         loans: state.loans.map(l => ({
             name: l.name,
@@ -2921,7 +2922,8 @@ function generateDataHash() {
             day_of_week: t.day_of_week,
             month_of_year: t.month_of_year,
             annual_growth: t.annual_growth,
-            isEnabled: t.isEnabled
+            isEnabled: t.isEnabled,
+            linkedAccountId: t.linkedAccountId || ''
         })),
         units: state.units.map(u => ({
             id: u.id,
