@@ -3477,40 +3477,41 @@ function txSummaryName(tx) {
     return `<span class="summary-name" data-summary-field="name" title="${tx.name}">${getTypeIndicator(tx.type, tx)}${tx.name}${txContingentBadge(tx)}${subtitleHtml(buildTxSubtitleParts(tx))}</span>`;
 }
 function renderFees() {
-    let html = '<div class="fees-section">';
-    html += '<h3 style="margin-bottom: 12px;">Asset Sale Fees</h3>';
+    let html = '';
     
     if (state.fees.length === 0) {
-        html += '<p style="color: #999; font-size: 0.9em;">No fees configured. Add fees to reduce cash deposits when assets are sold.</p>';
+        html = '<p style="color: #999; font-size: 0.9em;">No fees configured. Add fees to reduce cash deposits when assets are sold.</p>';
     } else {
-        html += state.fees.map(fee => {
+        html = state.fees.map(fee => {
             const asset = state.accounts.find(a => a.id === fee.assetId);
             const assetName = asset ? asset.name : '(deleted)';
-            return `<details class="fee-item" data-id="${fee.id}" style="margin-bottom: 12px;">
-                <summary style="cursor: pointer; padding: 8px; background: #f5f5f5; border-radius: 4px;">
-                    <span>${escapeHtml(fee.name)}</span>
-                    <span style="margin-left: 8px; color: #666; font-size: 0.9em;">${escapeHtml(assetName)}</span>
-                    <span style="margin-left: 8px; font-weight: bold;">${fee.feeType === 'percent' ? fee.amount + '%' : '$' + formatCurrency(parseFloat(fee.amount), 'usd')}</span>
+            const feeDisplay = fee.feeType === 'percent' ? `${parseFloat(fee.amount || 0)}%` : `$${formatCurrency(parseFloat(fee.amount || 0), 'usd')}`;
+            return `<details class="fee-item" data-id="${fee.id}">
+                <summary>
+                    <span class="summary-name" data-summary-field="name" title="${fee.name}">${escapeHtml(fee.name)}</span>
+                    <span class="summary-info" title="${assetName}">${escapeHtml(assetName)}</span>
+                    <span class="summary-info">${feeDisplay}</span>
+                    <button title="Delete" class="btn-delete-icon" data-delete-id="${fee.id}" data-type="fee">&times;</button>
                 </summary>
-                <div class="form-grid" style="padding: 12px 0;">
-                    ${createField(fee, 'name')}
-                    ${createField(fee, 'assetId', 'select', [
-                        { value: '', label: '-- Select Asset --' },
-                        ...state.accounts.filter(a => a.saleDate).map(a => ({ value: a.id, label: a.name }))
-                    ])}
-                    ${createField(fee, 'feeType', 'select', [
-                        { value: 'percent', label: 'Percent (%)' },
-                        { value: 'fixed', label: 'Fixed ($)' }
-                    ])}
-                    ${createField(fee, 'amount', 'number')}
-                    <button type="button" class="btn-delete-icon" data-delete-id="${fee.id}" data-type="fee" style="grid-column: 1 / -1; justify-self: start;">Delete</button>
+                <div class="details-content">
+                    <div class="form-grid">
+                        ${createField(fee, 'name')}
+                        ${createField(fee, 'assetId', 'select', [
+                            { value: '', label: '-- Select Asset --' },
+                            ...state.accounts.filter(a => a.saleDate).map(a => ({ value: a.id, label: a.name }))
+                        ])}
+                        ${createField(fee, 'feeType', 'select', [
+                            { value: 'percent', label: 'Percent (%)' },
+                            { value: 'fixed', label: 'Fixed ($)' }
+                        ])}
+                        ${createField(fee, 'amount', 'number')}
+                    </div>
                 </div>
             </details>`;
-        }).join('')
+        }).join('');
     }
-    html += '</div>';
-    html += '<button type="button" class="btn-add" onclick="addFee()" style="margin-top: 12px;">+ Add Fee</button>';
     
+    html += '<button type="button" class="btn-add" onclick="addFee()" style="margin-top: 12px;">+ Add Fee</button>';
     document.getElementById('fees-list').innerHTML = html;
 }
 function renderLoans() { 
