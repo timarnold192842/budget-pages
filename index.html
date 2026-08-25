@@ -1700,6 +1700,14 @@
                     <button class="btn-add" onclick="addGroup('account')">+ Add Group</button>
                 </div>
             </details>
+            <details id="fees-section" class="section-collapsible">
+                <summary class="section-header">
+                    <h2>Asset Sale Fees</h2>
+                </summary>
+                <div class="section-content">
+                    <div id="fees-list"></div>
+                </div>
+            </details>
             <details id="loans-section" class="section-collapsible">
                 <summary class="section-header">
                     <h2>Loans</h2>
@@ -2392,6 +2400,10 @@ function applyImportedData(importData) {
         state.transactions = cloneData(importData.transactions);
     }
 
+    if (Array.isArray(importData.fees)) {
+        state.fees = cloneData(importData.fees);
+    }
+
     if (Array.isArray(importData.units)) {
         state.units = cloneData(importData.units);
     }
@@ -2432,6 +2444,7 @@ function applyImportedData(importData) {
     if (!Array.isArray(state.accounts)) state.accounts = [];
     if (!Array.isArray(state.loans)) state.loans = [];
     if (!Array.isArray(state.transactions)) state.transactions = [];
+    if (!Array.isArray(state.fees)) state.fees = [];
     if (!Array.isArray(state.units) || state.units.length === 0) {
         state.units = [{ id: 'usd', name: 'USD', symbol: '$', usdRate: 1.0, isDefault: true, growthEnabled: true, priceTargets: [] }];
     }
@@ -2523,6 +2536,7 @@ function buildSerializableState() {
         accounts: cloneData(state.accounts),
         loans: cloneData(state.loans),
         transactions: cloneData(state.transactions),
+        fees: cloneData(state.fees),
         units: cloneData(state.units),
         accountGroups: cloneData(state.accountGroups),
         loanGroups: cloneData(state.loanGroups),
@@ -2924,6 +2938,12 @@ function generateDataHash() {
             annual_growth: t.annual_growth,
             isEnabled: t.isEnabled,
             linkedAccountId: t.linkedAccountId || ''
+        })),
+        fees: state.fees.map(f => ({
+            name: f.name,
+            assetId: f.assetId || '',
+            feeType: f.feeType,
+            amount: f.amount
         })),
         units: state.units.map(u => ({
             id: u.id,
@@ -3449,6 +3469,43 @@ function txContingentBadge(tx) {
 function txSummaryName(tx) {
     return `<span class="summary-name" data-summary-field="name" title="${tx.name}">${getTypeIndicator(tx.type, tx)}${tx.name}${txContingentBadge(tx)}${subtitleHtml(buildTxSubtitleParts(tx))}</span>`;
 }
+function renderFees() {
+    let html = '<div class="fees-section">';
+    html += '<h3 style="margin-bottom: 12px;">Asset Sale Fees</h3>';
+    
+    if (state.fees.length === 0) {
+        html += '<p style="color: #999; font-size: 0.9em;">No fees configured. Add fees to reduce cash deposits when assets are sold.</p>';
+    } else {
+        html += state.fees.map(fee => {
+            const asset = state.accounts.find(a => a.id === fee.assetId);
+            const assetName = asset ? asset.name : '(deleted)';
+            return `<details class="fee-item" data-id="${fee.id}" style="margin-bottom: 12px;">
+                <summary style="cursor: pointer; padding: 8px; background: #f5f5f5; border-radius: 4px;">
+                    <span>${escapeHtml(fee.name)}</span>
+                    <span style="margin-left: 8px; color: #666; font-size: 0.9em;">${escapeHtml(assetName)}</span>
+                    <span style="margin-left: 8px; font-weight: bold;">${fee.feeType === 'percent' ? fee.amount + '%' : '$' + formatCurrency(parseFloat(fee.amount), 'usd')}</span>
+                </summary>
+                <div class="form-grid" style="padding: 12px 0;">
+                    ${createField(fee, 'name')}
+                    ${createField(fee, 'assetId', 'select', [
+                        { value: '', label: '-- Select Asset --' },
+                        ...state.accounts.filter(a => a.saleDate).map(a => ({ value: a.id, label: a.name }))
+                    ])}
+                    ${createField(fee, 'feeType', 'select', [
+                        { value: 'percent', label: 'Percent (%)' },
+                        { value: 'fixed', label: 'Fixed ($)' }
+                    ])}
+                    ${createField(fee, 'amount', 'number')}
+                    <button type="button" class="btn-delete-icon" data-delete-id="${fee.id}" data-type="fee" style="grid-column: 1 / -1; justify-self: start;">Delete</button>
+                </div>
+            </details>`;
+        }).join('')
+    }
+    html += '</div>';
+    html += '<button type="button" class="btn-add" onclick="addFee()" style="margin-top: 12px;">+ Add Fee</button>';
+    
+    document.getElementById('fees-list').innerHTML = html;
+}
 function renderLoans() { 
     const ungroupedLoans = state.loans.filter(loan => !getItemGroup('loan', loan.id));
 
@@ -3773,7 +3830,7 @@ function syncNetWorthUI() {
     if (btn) { btn.classList.toggle('active', showNetWorth); btn.setAttribute('aria-pressed', String(showNetWorth)); }
     if (axisBtn) { axisBtn.classList.toggle('active', netWorthRightAxis); axisBtn.classList.toggle('nw-axis-visible', showNetWorth); axisBtn.setAttribute('aria-pressed', String(netWorthRightAxis)); }
 }
-function renderAll() { const uiState = getUIState(); renderUnits(); renderAccounts(); renderLoans(); renderTransactions(); applyUIState(uiState); renderScenarioBar(); syncNetWorthUI(); }
+function renderAll() { const uiState = getUIState(); renderUnits(); renderAccounts(); renderFees(); renderLoans(); renderTransactions(); applyUIState(uiState); renderScenarioBar(); syncNetWorthUI(); }
 
 // Debounced variant — coalesces rapid renderAll() calls (e.g. typing into a name field)
 let renderAllTimer = null;
@@ -3979,6 +4036,41 @@ function removeUnit(id) {
         renderAll(); 
         recalculateAndDraw(); 
     }
+}
+
+function addFee() {
+    const newFee = {
+        id: genId('fee'),
+        name: 'New Fee',
+        assetId: '',
+        feeType: 'percent',
+        amount: 0
+    };
+    
+    state.fees.unshift(newFee);
+    invalidateDataCache();
+    renderAll();
+    
+    setTimeout(() => {
+        const newDetails = document.querySelector(`details[data-id="${newFee.id}"]`);
+        if (newDetails) {
+            newDetails.open = true;
+            const nameField = newDetails.querySelector(`input[data-key="name"]`);
+            if (nameField) {
+                nameField.focus();
+                nameField.select();
+            }
+        }
+    }, 50);
+    
+    saveToLocalStorageDebounced();
+}
+
+function removeFee(id) {
+    state.fees = state.fees.filter(f => f.id !== id);
+    invalidateDataCache();
+    renderAll();
+    saveToLocalStorageDebounced();
 }
 
 // --- Group Management Functions ---
@@ -4441,7 +4533,7 @@ function calculateBalances() {
         }
         // --- Asset sale events ---
         // For any account with a saleDate matching today: zero the asset, zero its linked loan,
-        // and credit Cash with the net equity (assetValue - loanBalance).
+        // and credit Cash with the net equity (assetValue - loanBalance) minus any applicable fees.
         for (const acc of state.accounts) {
             if (!acc.saleDate) continue;
             if (toYMD(parseYMD(acc.saleDate) || new Date(acc.saleDate)) !== ymd) continue;
@@ -4451,7 +4543,22 @@ function calculateBalances() {
             // Find an enabled loan linked to this account
             const linkedLoan = state.loans.find(l => l.isEnabled && l.linkedAccountId === acc.id);
             const loanBal = linkedLoan ? (loanData[linkedLoan.name]?.balance[i] || 0) : 0;
-            const netProceeds = assetVal - loanBal;
+            let netProceeds = assetVal - loanBal;
+            
+            // Apply fees for this asset sale
+            const assetFees = state.fees.filter(f => f.assetId === acc.id);
+            let totalFeeAmount = 0;
+            assetFees.forEach(fee => {
+                let feeAmount = 0;
+                if (fee.feeType === 'percent') {
+                    feeAmount = Math.abs(netProceeds) * (parseFloat(fee.amount) || 0) / 100;
+                } else if (fee.feeType === 'fixed') {
+                    feeAmount = Math.abs(parseFloat(fee.amount) || 0);
+                }
+                totalFeeAmount += feeAmount;
+            });
+            netProceeds -= totalFeeAmount;
+            
             // Zero the asset from today onward (growth * 0 = 0, so future days stay 0)
             assetEntry.nativeBalance[i] = 0;
             assetEntry.balance[i] = 0;
@@ -4459,7 +4566,7 @@ function calculateBalances() {
             if (linkedLoan && loanData[linkedLoan.name]) {
                 loanData[linkedLoan.name].balance[i] = 0;
             }
-            // Credit net proceeds to Cash
+            // Credit net proceeds (after fees) to Cash
             if (netProceeds !== 0 && accountData[cashAccountName]) {
                 applyAccountDelta(accountData[cashAccountName], dates[i], i, netProceeds);
             }
@@ -6230,7 +6337,7 @@ function handleSidebarInput(e) {
         }
     }
     
-    for (const c of ['accounts', 'loans', 'transactions']) {
+    for (const c of ['accounts', 'loans', 'transactions', 'fees']) {
         let item = state[c].find(i => i.id === id);
         if (item) {
             const oldName = item.name;
@@ -6705,6 +6812,7 @@ function handleSidebarClick(e) {
         else if (type === 'loan') removeLoan(deleteId);
         else if (type === 'transaction') removeTransaction(deleteId);
         else if (type === 'unit') removeUnit(deleteId);
+        else if (type === 'fee') removeFee(deleteId);
     }
 }
 function throttle(func, delay) { let inProgress = false; return (...args) => { if (inProgress) return; inProgress = true; setTimeout(() => { func(...args); inProgress = false; }, delay); }; }
