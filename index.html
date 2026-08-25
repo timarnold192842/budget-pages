@@ -3029,7 +3029,14 @@ function createField(item, key, type = 'text', options = []) {
             // Special handling for units to show symbols instead of IDs
             h = state.units.map(u => `<option value="${u.id}" ${v === u.id ? 'selected' : ''}>${u.symbol}</option>`).join('');
         } else {
-            h = options.map(o => `<option value="${o}" ${v === o ? 'selected' : ''}>${o}</option>`).join('');
+            // Handle both string arrays and object arrays with value/label
+            h = options.map(o => {
+                if (typeof o === 'object' && o.value !== undefined && o.label !== undefined) {
+                    return `<option value="${o.value}" ${v === o.value ? 'selected' : ''}>${o.label}</option>`;
+                } else {
+                    return `<option value="${o}" ${v === o ? 'selected' : ''}>${o}</option>`;
+                }
+            }).join('');
         }
         return `<div><label for="${item.id}_${key}">${key.replace(/_/g, ' ')}</label><select id="${item.id}_${key}" data-id="${item.id}" data-key="${key}">${h}</select></div>`; 
     } 
