@@ -4593,10 +4593,18 @@ function calculateBalances() {
     performanceProfile.end('Daily Balance Calculations');
     
     performanceProfile.start('Finalize Results');
+    // Keep account and loan balances in separate maps so that a name collision
+    // (e.g. asset "Sleepy" + loan "Sleepy") can't cause one to overwrite the
+    // other in `balances` and corrupt net worth.
+    const accountBalances = {};
+    const loanBalances = {};
+    Object.keys(accountData).forEach(n => { accountBalances[n] = accountData[n].balance; });
+    Object.keys(loanData).forEach(n => { loanBalances[n] = loanData[n].balance; });
+    // `balances` is kept for legacy consumers (chart, plotOptions). When an
+    // account and loan share the same name, the account wins here; the flat
+    // map is inherently ambiguous, but NW uses the split maps below.
+    Object.keys(loanData).forEach(n => { balances[n] = loanData[n].balance; });
     Object.keys(accountData).forEach(n => { balances[n] = accountData[n].balance; });
-    Object.keys(loanData).forEach(n => { 
-        balances[n] = loanData[n].balance; 
-    });
     performanceProfile.end('Finalize Results');
     
     if (performanceProfile.enabled) {
@@ -4604,7 +4612,7 @@ function calculateBalances() {
         const totalLoans = Object.keys(loanData).length;
     }
     
-    return { dates, balances };
+    return { dates, balances, accountBalances, loanBalances };
 }
 
 // --- Charting ---
@@ -5459,9 +5467,28 @@ const scenarioOverlay = { enabled: false, unitId: null, scenarios: new Set() };
 
 // --- Net worth from cached / computed data ---
 function computeNetWorthSeries(data) {
-    if (!data || !data.balances || !data.dates) return null;
+    if (!data || !data.dates) return null;
     const len = data.dates.length;
     const series = new Array(len).fill(0);
+    // Prefer the split maps so shared account/loan names (e.g. an asset
+    // and its linked loan both named "Sleepy") don't collide.
+    const acctMap = data.accountBalances;
+    const loanMap = data.loanBalances;
+    if (acctMap && loanMap) {
+        for (const name of Object.keys(acctMap)) {
+            const arr = acctMap[name];
+            if (!Array.isArray(arr)) continue;
+            for (let i = 0; i < len; i++) series[i] += arr[i] || 0;
+        }
+        for (const name of Object.keys(loanMap)) {
+            const arr = loanMap[name];
+            if (!Array.isArray(arr)) continue;
+            for (let i = 0; i < len; i++) series[i] -= arr[i] || 0;
+        }
+        return series;
+    }
+    // Legacy fallback (older cache shape): iterate flat balances.
+    if (!data.balances) return series;
     const accountNames = new Set(state.accounts.map(a => a.name));
     const loanNames = new Set(state.loans.map(l => l.name));
     for (const name of Object.keys(data.balances)) {
@@ -6421,6 +6448,8 @@ function handleSidebarInput(e) {
                 }
             } else if ((key === 'end_date' || key === 'start_date') && c === 'transactions') {
                 rebuildSubtitleDOM(id, buildTxSubtitleParts(item));
+                const detailsEl = document.querySelector(`details[data-id="${id}"]`);
+                if (detailsEl) detailsEl.classList.toggle('tx-stale', isTxFullyPast(item));
             } else if (key === 'amount' && c === 'transactions') {
                 const summaryAmountEl = document.querySelector(`details[data-id="${id}"] .summary-info input`);
                 if (summaryAmountEl) {
