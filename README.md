@@ -4,9 +4,10 @@ A static, browser-based financial planning workspace, published with GitHub Page
 
 ## Using the workspace
 
-- **Edit plan** opens the input editor. It becomes a modal drawer on phones and tablets; Escape or the close button returns to the dashboard. On desktop, drag the divider to resize it.
+- The **◀ / ▶ edge tab** shows or hides the plan editor on every screen size. On phones and tablets the editor opens as a modal drawer; Escape, the × button, or tapping outside closes it. On desktop, drag the divider to resize it.
+- The **⌃** button in the top bar hides it (remembered per browser); the small tab at the top right brings it back.
 - Accounts, loans, transactions, currencies, price targets, asset sale fees, and scenarios retain their existing calculation behavior.
-- **1Y / 3Y / 5Y / 10Y** select calendar ranges starting today. Fine-tune controls adjust the current view. Chart series can be toggled with a mouse, touch, or keyboard. To keep longer views legible, transaction date markers appear only up to two years and quarterly markers up to six years; annual and enabled milestone markers remain.
+- **1Y / 3Y / 5Y / 10Y** select calendar ranges starting today; the always-visible row beneath them (−5y … +5y, Reset) fine-tunes the end of the current view. Chart series can be toggled with a mouse, touch, or keyboard. To keep longer views legible, transaction date markers appear only up to two years and quarterly markers up to six years; annual and enabled milestone markers remain.
 - Scenario tabs support arrow keys, Home, and End. **Rename current** avoids relying on double-click on touch devices.
 - Changes save locally to the current browser. There is no cross-device synchronization. **Export backup** downloads the active plan as JSON; import it through **Backup & data** on another device. Separate scenarios remain in the browser's scenario registry; export each scenario you want to transfer.
 - Clearing saved copies requires confirmation. The current plan remains open; another edit saves it again.

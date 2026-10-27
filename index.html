@@ -19,7 +19,7 @@
     <noscript><p class="app-error">JavaScript is required to calculate and edit your forecast.</p></noscript>
     <div id="app-error" class="app-error" role="alert" hidden></div>
     <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
-    <header class="app-header">
+    <header class="app-header" id="app-header">
         <a class="brand" href="./" aria-label="Forecast home">
             <span class="brand-mark" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l5-6 4 3 7-10M14 4h6v6"/></svg></span>
             <span>Forecast</span>
@@ -28,9 +28,10 @@
         <div class="header-actions">
             <span id="save-status" class="save-status" role="status">Saved on this device</span>
             <button type="button" class="header-export" onclick="exportToJSON('all')">Export backup</button>
-            <button type="button" id="planner-toggle" class="primary-button" aria-controls="sidebar" aria-expanded="true">Edit plan</button>
+            <button type="button" id="header-hide" class="icon-button header-collapse" aria-label="Hide top bar" title="Hide top bar" aria-controls="app-header"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
         </div>
     </header>
+    <button type="button" id="header-show" class="header-show" aria-label="Show top bar" title="Show top bar" aria-controls="app-header" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     <button type="button" id="planner-backdrop" class="planner-backdrop" aria-label="Close plan editor" tabindex="-1" hidden></button>
     <div class="container">
         <aside class="sidebar" id="sidebar" aria-labelledby="planner-title">
@@ -136,7 +137,7 @@
             </details>
         </aside>
         <div class="resizer" id="drag-handle">
-             <button id="toggle-sidebar-btn" title="Toggle plan editor" aria-label="Toggle plan editor" aria-controls="sidebar" aria-expanded="true">◀</button>
+             <button id="toggle-sidebar-btn" title="Hide plan editor" aria-label="Hide plan editor" aria-controls="sidebar" aria-expanded="true">◀</button>
         </div>
         <main class="main-content" id="main-content" tabindex="-1">
             <h1 class="visually-hidden">Your financial outlook</h1>
@@ -147,11 +148,22 @@
             <section class="forecast-card" aria-labelledby="forecast-title">
             <div class="forecast-heading"><div><p class="eyebrow">LOOKING AHEAD</p><h2 id="forecast-title">Balance over time</h2></div><span id="chart-duration-label" class="duration-badge" aria-live="polite">5 years</span></div>
             <div class="chart-controls">
-                <div class="range-presets" role="group" aria-label="Forecast time range">
-                    <button type="button" data-range-months="12" aria-pressed="false">1Y</button>
-                    <button type="button" data-range-months="36" aria-pressed="false">3Y</button>
-                    <button type="button" data-range-months="60" aria-pressed="false">5Y</button>
-                    <button type="button" data-range-months="120" aria-pressed="false">10Y</button>
+                <div class="range-controls">
+                    <div class="range-presets" role="group" aria-label="Forecast time range">
+                        <button type="button" data-range-months="12" aria-pressed="false">1Y</button>
+                        <button type="button" data-range-months="36" aria-pressed="false">3Y</button>
+                        <button type="button" data-range-months="60" aria-pressed="false">5Y</button>
+                        <button type="button" data-range-months="120" aria-pressed="false">10Y</button>
+                    </div>
+                    <div class="zoom-controls" role="group" aria-label="Fine-tune forecast end date">
+                        <button class="year-adjust-btn" onclick="adjustYears(-5)" title="Remove 5 years" aria-label="Remove 5 years">−5y</button>
+                        <button class="year-adjust-btn" onclick="adjustYears(-1)" title="Remove 1 year" aria-label="Remove 1 year">−1y</button>
+                        <button class="year-adjust-btn" onclick="adjustMonths(-1)" title="Remove 1 month" aria-label="Remove 1 month">−1m</button>
+                        <button class="zoom-reset-btn" onclick="resetZoom()" title="Reset to 5-year view">Reset</button>
+                        <button class="year-adjust-btn" onclick="adjustMonths(1)" title="Add 1 month" aria-label="Add 1 month">+1m</button>
+                        <button class="year-adjust-btn" onclick="adjustYears(1)" title="Add 1 year" aria-label="Add 1 year">+1y</button>
+                        <button class="year-adjust-btn" onclick="adjustYears(5)" title="Add 5 years" aria-label="Add 5 years">+5y</button>
+                    </div>
                 </div>
                 <div class="chart-actions">
                     <button id="milestones-btn" class="freeze-y-btn" onclick="toggleMilestones()" title="Show milestone markers on chart" aria-label="Toggle milestones" aria-pressed="false">Milestones</button>
@@ -171,18 +183,6 @@
                 <div class="chart-legend" id="chart-legend" role="group" aria-label="Chart series visibility"></div>
             </div>
             <p class="chart-hint">Select a series to show or hide it. Pinch or Ctrl + scroll to zoom; drag to pan. Date markers simplify on longer views.</p>
-            <details class="fine-tune">
-                <summary>Fine-tune the time range</summary>
-                <div class="zoom-controls" role="group" aria-label="Adjust forecast duration">
-                    <button class="year-adjust-btn" onclick="adjustYears(-5)" title="Remove 5 years">-5y</button>
-                    <button class="year-adjust-btn" onclick="adjustYears(-1)" title="Remove 1 year">-1y</button>
-                    <button class="year-adjust-btn" onclick="adjustMonths(-1)" title="Remove 1 month">-1m</button>
-                    <button class="zoom-reset-btn" onclick="resetZoom()" title="Reset to 5-year view">Reset view</button>
-                    <button class="year-adjust-btn" onclick="adjustMonths(1)" title="Add 1 month">+1m</button>
-                    <button class="year-adjust-btn" onclick="adjustYears(1)" title="Add 1 year">+1y</button>
-                    <button class="year-adjust-btn" onclick="adjustYears(5)" title="Add 5 years">+5y</button>
-                </div>
-            </details>
             <div class="cashflow-heading"><h3>Cash flow summary</h3><span>Visible date range</span></div>
             <div class="chart-stats-row" id="chart-stats-row">
                 <div class="cash-stat"><label for="showMinCashLine"><input type="checkbox" id="showMinCashLine" checked onchange="toggleMinCashLine()"> Lowest cash</label><b id="chart-min-cash-value">—</b></div>

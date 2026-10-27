@@ -135,9 +135,37 @@ function trapFocus(event, root) {
     }
 }
 
+const HEADER_HIDDEN_KEY = 'forecastHeaderHidden';
+
+function initializeHeaderToggle() {
+    const hideButton = document.getElementById('header-hide');
+    const showButton = document.getElementById('header-show');
+    const setHidden = (hidden, focus) => {
+        document.body.classList.toggle('header-hidden', hidden);
+        showButton.hidden = !hidden;
+        hideButton.setAttribute('aria-expanded', String(!hidden));
+        showButton.setAttribute('aria-expanded', String(!hidden));
+        try {
+            localStorage.setItem(HEADER_HIDDEN_KEY, String(hidden));
+        } catch (error) {
+            console.warn('Unable to persist top bar preference:', error);
+        }
+        if (focus) (hidden ? showButton : hideButton).focus();
+        requestAnimationFrame(() => chartInstance?.resize());
+    };
+    hideButton.addEventListener('click', () => setHidden(true, true));
+    showButton.addEventListener('click', () => setHidden(false, true));
+    let stored = null;
+    try {
+        stored = localStorage.getItem(HEADER_HIDDEN_KEY);
+    } catch (error) {
+        console.warn('Unable to read top bar preference:', error);
+    }
+    setHidden(stored === 'true', false);
+}
+
 function initializeWorkspace() {
     const sidebar = document.getElementById('sidebar');
-    const opener = document.getElementById('planner-toggle');
     const closer = document.getElementById('planner-close');
     const handle = document.getElementById('drag-handle');
     const handleButton = document.getElementById('toggle-sidebar-btn');
@@ -147,7 +175,6 @@ function initializeWorkspace() {
     const compact = matchMedia('(max-width: 1100px)');
     let open = !compact.matches;
     let desktopWidth = '';
-    let returnFocus = opener;
     let resizeStart = null;
 
     function setOpen(value, focus = true) {
@@ -156,8 +183,10 @@ function initializeWorkspace() {
         if (value && !compact.matches) sidebar.style.flexBasis = desktopWidth;
         sidebar.classList.toggle('sidebar-hidden', !open);
         sidebar.inert = !open;
-        opener.setAttribute('aria-expanded', String(open));
+        const label = open ? 'Hide plan editor' : 'Show plan editor';
         handleButton.setAttribute('aria-expanded', String(open));
+        handleButton.setAttribute('aria-label', label);
+        handleButton.title = label;
         handleButton.textContent = open ? '\u25c0' : '\u25b6';
         backdrop.hidden = !modal;
         main.inert = modal;
@@ -171,26 +200,19 @@ function initializeWorkspace() {
         }
         if (focus) {
             if (open) focusPlanner();
-            else (returnFocus?.isConnected ? returnFocus : opener).focus();
+            else handleButton.focus();
         }
         requestAnimationFrame(() => chartInstance?.resize());
     }
 
-    opener.addEventListener('click', () => {
-        returnFocus = opener;
-        setOpen(!open);
-    });
-    handleButton.addEventListener('click', () => {
-        returnFocus = handleButton;
-        setOpen(!open);
-    });
+    handleButton.addEventListener('click', () => setOpen(!open));
     closer.addEventListener('click', () => setOpen(false));
     backdrop.addEventListener('click', () => setOpen(false));
     compact.addEventListener('change', () => {
         const wasInside = sidebar.contains(document.activeElement);
-        returnFocus = opener;
         setOpen(!compact.matches, wasInside);
     });
+    initializeHeaderToggle();
     document.addEventListener('keydown', event => {
         if (document.getElementById('sell-modal') || document.querySelector('dialog[open]')) return;
         if (compact.matches && open) {
