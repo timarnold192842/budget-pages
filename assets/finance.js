@@ -4155,7 +4155,7 @@ function openSellModal(unitId) {
         setTimeout(() => {
             modal.remove();
             if (returnFocus?.isConnected) returnFocus.focus();
-            else document.getElementById('planner-close').focus();
+            else focusPlanner();
         }, 160);
     };
     modal.querySelector('#sm-cancel').addEventListener('click', close);

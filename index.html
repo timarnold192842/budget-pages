@@ -22,8 +22,9 @@
     <header class="app-header">
         <a class="brand" href="./" aria-label="Forecast home">
             <span class="brand-mark" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l5-6 4 3 7-10M14 4h6v6"/></svg></span>
-            <span>Forecast<span class="brand-caption">PERSONAL FINANCE</span></span>
+            <span>Forecast</span>
         </a>
+        <span class="scenario-context" title="Active scenario"><span class="visually-hidden">Active scenario: </span><strong id="active-scenario-label">Default</strong></span>
         <div class="header-actions">
             <span id="save-status" class="save-status" role="status">Saved on this device</span>
             <button type="button" class="header-export" onclick="exportToJSON('all')">Export backup</button>
@@ -34,10 +35,9 @@
     <div class="container">
         <aside class="sidebar" id="sidebar" aria-labelledby="planner-title">
             <div class="planner-heading">
-                <div><p class="eyebrow">YOUR INPUTS</p><h2 id="planner-title">Plan your next move</h2></div>
+                <h2 id="planner-title">Edit plan</h2>
                 <button type="button" id="planner-close" class="icon-button" aria-label="Close plan editor">&times;</button>
             </div>
-            <p class="planner-description">Adjust the details. See the bigger picture.</p>
             <div id="scenario-sticky-header">
                 <div class="scenario-heading"><span class="eyebrow">SCENARIOS</span><button type="button" class="text-button" onclick="renameScenario(scenarioManager.activeScenarioId)">Rename current</button></div>
                 <div id="scenario-bar" role="tablist" aria-label="Scenarios"></div>
@@ -139,10 +139,7 @@
              <button id="toggle-sidebar-btn" title="Toggle plan editor" aria-label="Toggle plan editor" aria-controls="sidebar" aria-expanded="true">◀</button>
         </div>
         <main class="main-content" id="main-content" tabindex="-1">
-            <div class="page-heading">
-                <div><p class="eyebrow">THE BIG PICTURE</p><h1>Your financial outlook</h1><p>A little clarity for whatever comes next.</p></div>
-                <span class="scenario-context">Scenario <strong id="active-scenario-label">Default</strong></span>
-            </div>
+            <h1 class="visually-hidden">Your financial outlook</h1>
             <section class="snapshot-section" aria-labelledby="snapshot-title">
                 <h2 id="snapshot-title" class="visually-hidden">Today's financial snapshot</h2>
                 <div class="today-panel" id="today-panel" aria-live="polite"></div>

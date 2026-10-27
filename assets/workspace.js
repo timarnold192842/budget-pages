@@ -1,3 +1,15 @@
+function focusPlanner(attempt = 0) {
+    const closer = document.getElementById('planner-close');
+    const target = closer.getClientRects().length
+        ? closer
+        : document.querySelector('#scenario-bar [aria-selected="true"]');
+    target?.focus();
+    // The drawer may still be finishing its visibility transition.
+    if (target && document.activeElement !== target && attempt < 30) {
+        requestAnimationFrame(() => focusPlanner(attempt + 1));
+    }
+}
+
 function setSaveStatus(message, status = 'saved') {
     const element = document.getElementById('save-status');
     element.textContent = message;
@@ -41,7 +53,7 @@ function showPlanDialog({ title, message = '', initialValue, confirmLabel = 'Sav
             const result = dialog.returnValue === 'confirm' ? (hasInput ? input.value : '') : null;
             dialog.remove();
             if (returnFocus?.isConnected) returnFocus.focus();
-            else document.getElementById('planner-close').focus();
+            else focusPlanner();
             resolve(result);
         }, { once: true });
         dialog.addEventListener('click', event => {
@@ -158,7 +170,7 @@ function initializeWorkspace() {
             sidebar.removeAttribute('aria-modal');
         }
         if (focus) {
-            if (open) closer.focus();
+            if (open) focusPlanner();
             else (returnFocus?.isConnected ? returnFocus : opener).focus();
         }
         requestAnimationFrame(() => chartInstance?.resize());
