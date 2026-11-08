@@ -1084,6 +1084,9 @@ body.dark-mode .payoff-subtitle {
 .transaction-type-indicator.quarterly {
     background-color: #fd7e14; /* Orange for Quarterly */
 }
+.transaction-type-indicator.daily {
+    background-color: #6f42c1; /* Purple for Daily */
+}
 .btn-delete-icon {
     grid-column: 4;
     border: none;

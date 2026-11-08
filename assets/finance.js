@@ -290,10 +290,11 @@ function generateVerticalLines(startDate, endDate) {
     // Dense recurring dates obscure the balance lines at long horizons.
     if (visibleYears > 2) return lines;
 
-    // Add low-visibility markers for visible transaction dates.
+    // Add low-visibility markers for visible transaction dates. Daily items are skipped:
+    // a line for every day would just paint a solid band over the chart.
     const txDateSet = new Set();
     state.transactions
-        .filter(tx => tx?.isEnabled && state.transactionPlotOptions[tx.id] !== false)
+        .filter(tx => tx?.isEnabled && tx.type !== 'Daily' && state.transactionPlotOptions[tx.id] !== false)
         .forEach(txData => {
             const txInstance = new Transaction(txData);
             txInstance.generateDates(end).forEach(({ date }) => {
@@ -404,6 +405,16 @@ class Transaction {
             case 'OneTime': {
                 if (this.start_date <= forecast_end && (!this.end_date || this.start_date <= this.end_date)) {
                     dates.push({ date: this.start_date, amount: this.getAmount(this.start_date) });
+                }
+                break;
+            }
+            case 'Daily': {
+                const last = this.end_date && this.end_date < forecast_end ? this.end_date : forecast_end;
+                const currentDate = new Date(this.start_date);
+                while (currentDate <= last) {
+                    const c = new Date(currentDate);
+                    dates.push({ date: c, amount: this.getAmount(c) });
+                    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
                 }
                 break;
             }
@@ -1682,6 +1693,7 @@ function updateLoanCurrentBalanceEl(id, loan) {
 }
 function getTypeIndicator(type, tx) {
     const indicators = {
+        'Daily': { text: 'D', class: 'daily' },
         'Monthly': { text: 'M', class: 'monthly' },
         'Weekly': { text: 'W', class: 'weekly' },
         'BiWeekly': { text: 'BiW', class: 'biweekly' },
@@ -2014,7 +2026,7 @@ function renderTransactions() {
                                 <div class="details-content">
                                     <div class="form-grid">
                                         ${createField(tx, 'name')}
-                                        ${createField(tx, 'type', 'select', ['OneTime', 'Monthly', 'Weekly', 'BiWeekly', 'Annual', 'Quarterly'])}
+                                        ${createField(tx, 'type', 'select', ['OneTime', 'Daily', 'Monthly', 'Weekly', 'BiWeekly', 'Annual', 'Quarterly'])}
                                         ${createField(tx, 'amount', 'number')}
                                         ${createField(tx, 'units', 'select', getUnitOptions())}
                                         ${createField(tx, 'split_amount', 'number')}
@@ -2062,7 +2074,7 @@ function renderTransactions() {
                 <div class="details-content">
                     <div class="form-grid">
                         ${createField(tx, 'name')}
-                        ${createField(tx, 'type', 'select', ['OneTime', 'Monthly', 'Weekly', 'BiWeekly', 'Annual', 'Quarterly'])}
+                        ${createField(tx, 'type', 'select', ['OneTime', 'Daily', 'Monthly', 'Weekly', 'BiWeekly', 'Annual', 'Quarterly'])}
                         ${createField(tx, 'amount', 'number')}
                         ${createField(tx, 'units', 'select', getUnitOptions())}
                         ${createField(tx, 'split_amount', 'number')}

@@ -224,3 +224,30 @@ test('date markers simplify only beyond the documented zoom thresholds', () => {
     assert.equal(annualOnly.some(id => id.startsWith('quarter-')), false);
     assert.ok(annualOnly.every(id => id.startsWith('year-')));
 });
+
+test('daily transactions occur every day through the end date and are applied to the forecast', () => {
+    const runtime = createRuntime();
+    runtime.load();
+    const result = runtime.run(`(() => {
+        const tx = new Transaction({ id: 'daily-test', name: 'Coffee', type: 'Daily', amount: 5,
+            start_date: '2026-11-08', end_date: '2026-11-14', from_account: 'Cash', to_account: 'External' });
+        const dates = tx.generateDates(parseYMD('2027-01-01')).map(d => toYMD(d.date));
+        const openEnded = new Transaction({ id: 'daily-open', name: 'Open', type: 'Daily', amount: 1, start_date: '2026-12-30' })
+            .generateDates(parseYMD('2027-01-02')).map(d => toYMD(d.date));
+        const cashOn = (data, ymd) => data.balances.Cash[data.dates.findIndex(d => toYMD(d) === ymd)];
+        const base = calculateBalances();
+        const baseline = cashOn(base, '2026-11-17');
+        const baselineEnd = base.balances.Cash.at(-1);
+        state.transactions.push({ id: 'daily-forecast', name: 'Daily drip', type: 'Daily', amount: 10,
+            start_date: '2026-11-08', end_date: '2026-11-17', from_account: 'Cash', to_account: 'External', isEnabled: true });
+        invalidateTransactionCache();
+        const after = calculateBalances();
+        return JSON.stringify({ dates, openEnded, delta: baseline - cashOn(after, '2026-11-17'), deltaEnd: baselineEnd - after.balances.Cash.at(-1), indicator: getTypeIndicator('Daily') });
+    })()`);
+    const parsed = JSON.parse(result);
+    assert.deepEqual(parsed.dates, ['2026-11-08', '2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14']);
+    assert.deepEqual(parsed.openEnded, ['2026-12-30', '2026-12-31', '2027-01-01', '2027-01-02']);
+    assert.ok(Math.abs(parsed.delta - 100) < 0.10, `ten daily $10 outflows should reduce cash by $100 by 2026-11-17 (got ${parsed.delta})`);
+    assert.ok(parsed.deltaEnd >= parsed.delta - 0.01, 'the outflow persists through the rest of the forecast');
+    assert.match(parsed.indicator, /class="transaction-type-indicator daily"[^>]*>D</);
+});
